@@ -309,7 +309,10 @@ export class ChatService {
                 'sop_subtask_completed',
                 'sop_proof_uploaded',
                 'sop_completion_requested',
-                'sop_completion_responded'
+                'sop_completion_responded',
+                'sop_subtask_approval_requested',
+                'sop_subtask_changes_requested',
+                'sop_subtask_comment_added'
             ];
             sopEvents.forEach(evt => {
                 this.socket!.on(evt, (data: any) => {

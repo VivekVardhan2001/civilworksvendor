@@ -13,6 +13,19 @@ export interface SubtaskProofImage {
     created_at?: string;
 }
 
+export interface SOPComment {
+    id: number;
+    order_id: number;
+    order_service_id?: number | null;
+    subtask_id?: number | null;
+    author_type: 'customer' | 'vendor' | 'admin' | 'system';
+    author_id?: number | null;
+    author_name?: string | null;
+    kind: 'comment' | 'approval_requested' | 'approved' | 'changes_requested' | string;
+    comment?: string | null;
+    created_at?: string;
+}
+
 export interface SOPSubtask {
     id: number;
     order_service_id: number;
@@ -22,8 +35,11 @@ export interface SOPSubtask {
     description?: string;
     start_date?: string;
     end_date?: string;
-    status: 'pending' | 'in_progress' | 'completed';
+    status: 'pending' | 'in_progress' | 'approval_pending' | 'completed';
     sequence_order: number;
+    next_order_service_id?: number | null;
+    comments?: SOPComment[];
+    comments_count?: number;
     completed_at?: string;
     proof_image_url?: string;
     proof_images?: SubtaskProofImage[];
@@ -49,6 +65,7 @@ export interface SOPServiceItem {
     calculated_progress?: number;
     subtasks?: SOPSubtask[];
     completion_request?: any;
+    comments?: SOPComment[];
     expanded?: boolean;
 }
 
@@ -137,6 +154,16 @@ export class SOPService {
 
     raiseCompletionRequest(serviceId: number | string, note?: string): Observable<any> {
         return this.http.post<any>(`${environment.apiUrl}/sop/services/${serviceId}/raise-completion-request`, { note })
+            .pipe(map(res => res.data));
+    }
+
+    reviewSubtask(subtaskId: number | string, action: 'approve' | 'request_changes', comment?: string): Observable<SOPSubtask> {
+        return this.http.post<any>(`${environment.apiUrl}/sop/subtasks/${subtaskId}/review`, { action, comment })
+            .pipe(map(res => res.data));
+    }
+
+    addSubtaskComment(subtaskId: number | string, comment: string): Observable<SOPComment> {
+        return this.http.post<any>(`${environment.apiUrl}/sop/subtasks/${subtaskId}/comments`, { comment })
             .pipe(map(res => res.data));
     }
 

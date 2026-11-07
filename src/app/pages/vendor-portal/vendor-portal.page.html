@@ -235,7 +235,7 @@
 
                 <button type="button" class="tab-item-btn" [class.active]="activeTab === 'chat'" (click)="openChatsTab()">
                     <ion-icon name="chatbubbles-outline"></ion-icon>
-                    <span>Project Chats</span>
+                    <span>Project Discussions</span>
                     <span class="badge-count alert-badge" *ngIf="unreadChatsCount > 0">{{ unreadChatsCount }}</span>
                 </button>
 
@@ -402,15 +402,15 @@
                             </button>
                         </div>
 
-                        <!-- Accepted Actions: Open Chat Group & SOP -->
+                        <!-- Accepted Actions: Project Discussions & Site Workflow -->
                         <div class="accepted-btn-row" *ngIf="order.vendor_status === 'accepted' && !order.is_removed">
                             <button type="button" class="btn-chat-action" (click)="openChatForOrder(order)">
                                 <ion-icon name="chatbubbles"></ion-icon>
-                                <span>Project Communication Group</span>
+                                <span>Project Discussions</span>
                             </button>
-                            <button type="button" class="btn-sop-action" (click)="openSopForOrder(order)" title="Open SOP Sequence">
+                            <button type="button" class="btn-sop-action" (click)="openSopForOrder(order)" title="Open Site Workflow">
                                 <ion-icon name="list-outline"></ion-icon>
-                                <span>SOP Sequence</span>
+                                <span>Site Workflow</span>
                             </button>
                         </div>
 
@@ -489,9 +489,9 @@
                                     <ion-icon name="time-outline"></ion-icon>
                                     <span>Schedule Alert</span>
                                 </span>
-                                <button type="button" class="btn-notif-chat" (click)="openChatForNotif(n)" title="Open Project Group Chat">
+                                <button type="button" class="btn-notif-chat" (click)="openChatForNotif(n)" title="Open Project Discussions">
                                     <ion-icon name="chatbubbles-outline"></ion-icon>
-                                    <span>Project Chat</span>
+                                    <span>Project Discussions</span>
                                 </button>
                             </div>
 
@@ -509,9 +509,9 @@
                                     <ion-icon name="checkmark-circle"></ion-icon>
                                     <span>Accepted</span>
                                 </span>
-                                <button type="button" class="btn-notif-chat" (click)="openChatForNotif(n)" title="Open Project Group Chat">
+                                <button type="button" class="btn-notif-chat" (click)="openChatForNotif(n)" title="Open Project Discussions">
                                     <ion-icon name="chatbubbles-outline"></ion-icon>
-                                    <span>Project Chat</span>
+                                    <span>Project Discussions</span>
                                 </button>
                             </div>
 
@@ -561,7 +561,7 @@
         <div class="dashboard-tab-content" *ngIf="activeTab === 'chat'">
             <div class="chats-hub-container">
                 <div class="section-title-row">
-                    <h3>Project Group Chats</h3>
+                    <h3>Project Discussions</h3>
                     <span class="notif-note">WhatsApp-style live communication with customers and co-contractors.</span>
                 </div>
 
@@ -572,8 +572,8 @@
 
                 <div class="state-empty-box" *ngIf="!loadingConversations && conversations.length === 0">
                     <ion-icon name="chatbubbles-outline"></ion-icon>
-                    <h3>No Active Project Chats</h3>
-                    <p>Accept a pending service request to be automatically joined into the live project group chat with the customer.</p>
+                    <h3>No Active Project Discussions</h3>
+                    <p>Accept a pending service request to be automatically joined into Project Discussions with the customer.</p>
                     <button type="button" class="btn-browse-orders" (click)="activeTab = 'orders'">View My Orders</button>
                 </div>
 
@@ -596,7 +596,7 @@
                             </div>
                         </div>
                         <button type="button" class="btn-enter-chat">
-                            <span>Open Chat</span>
+                            <span>Open Discussion</span>
                             <ion-icon name="arrow-forward"></ion-icon>
                         </button>
                     </div>

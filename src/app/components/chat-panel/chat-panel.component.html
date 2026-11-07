@@ -14,7 +14,7 @@
                     </div>
                 </div>
 
-                <button type="button" class="drawer-close-btn" (click)="close.emit()" aria-label="Close Chat">
+                <button type="button" class="drawer-close-btn" (click)="close.emit()" aria-label="Close">
                     <ion-icon name="close"></ion-icon>
                 </button>
             </div>
@@ -110,7 +110,7 @@
             </div>
         </div>
 
-        <!-- RIGHT PANE: Chat Conversation or Embedded SOP -->
+        <!-- RIGHT PANE: Project Discussions or embedded Site Workflow -->
         <div class="chat-right-pane" *ngIf="activeConversation">
             <!-- Tier 1: Main Header (Title, Status, Actions, About, Close) -->
             <div class="right-header-bar">
@@ -214,15 +214,21 @@
                         </div>
                     </div>
 
-                    <!-- Vendor: Submit Work Completed Button -->
+                    <!-- Vendor: send finished work to the customer for approval -->
                     <button *ngIf="!isOrderClosed && canRequestCompletion"
                             type="button" 
                             class="btn-vendor-request-completion"
                             (click)="promptRequestCompletion()"
-                            title="Submit that work has completed and raise acceptance request to customer">
+                            title="Send your finished work to the customer for approval">
                         <ion-icon name="checkmark-done-circle"></ion-icon>
-                        <span>Submit Work Completed</span>
+                        <span>Submit for Approval</span>
                     </button>
+
+                    <!-- Vendor: waiting for the customer's approval -->
+                    <span *ngIf="!isOrderClosed && !isMyWorkCompleted && !canRequestCompletion && myServiceAwaitingApproval" class="badge-vendor-approval-pending" title="The customer has been asked to approve your work">
+                        <ion-icon name="hourglass-outline"></ion-icon>
+                        <span>Approval Pending</span>
+                    </span>
 
                     <!-- Vendor: Work Completed Badge -->
                     <span *ngIf="!isOrderClosed && isMyWorkCompleted" class="badge-vendor-work-done">
@@ -237,17 +243,17 @@
                     </span>
 
                     <!-- Chat / SOP Top Header Segmented Toggle -->
-                    <div class="header-chat-sop-segmented" title="Switch between Chat and SOP for this order">
-                        <button type="button" class="tab-pill-btn" [class.active]="activeViewTab === 'chat'" (click)="setViewTab('chat')" title="View Chat Messages">
-                            <span>chat</span>
+                    <div class="header-chat-sop-segmented" title="Switch between Project Discussions and Site Workflow for this order">
+                        <button type="button" class="tab-pill-btn" [class.active]="activeViewTab === 'chat'" (click)="setViewTab('chat')" title="View Project Discussions">
+                            <span>Project Discussions</span>
                         </button>
-                        <button type="button" class="tab-pill-btn" [class.active]="activeViewTab === 'sop'" (click)="setViewTab('sop')" title="View Sequence of Operations (SOP)">
-                            <span>sop</span>
+                        <button type="button" class="tab-pill-btn" [class.active]="activeViewTab === 'sop'" (click)="setViewTab('sop')" title="View Site Workflow">
+                            <span>Site Workflow</span>
                         </button>
                     </div>
 
                     <!-- Right Header Close Button -->
-                    <button type="button" class="drawer-close-btn right-close-btn" (click)="close.emit()" aria-label="Close Chat" title="Close Chat">
+                    <button type="button" class="drawer-close-btn right-close-btn" (click)="close.emit()" aria-label="Close" title="Close">
                         <ion-icon name="close"></ion-icon>
                     </button>
                 </div>
@@ -548,13 +554,13 @@
                 <!-- Loading Skeleton -->
                 <div class="sop-emb-loading" *ngIf="loadingSop && (!sopData || !sopData.services || sopData.services.length === 0)">
                     <ion-spinner name="crescent"></ion-spinner>
-                    <span>Loading Sequence of Operations...</span>
+                    <span>Loading Site Workflow...</span>
                 </div>
 
                 <!-- Empty State -->
                 <div class="sop-emb-empty" *ngIf="!loadingSop && (!sopData || !sopData.services || sopData.services.length === 0)">
                     <ion-icon name="clipboard-outline"></ion-icon>
-                    <h4>No Assigned Services in Sequence</h4>
+                    <h4>No Site Workflow Configured Yet</h4>
                     <p>Services assigned to your vendor account will appear here in chronological sequence.</p>
                 </div>
 
@@ -564,7 +570,7 @@
                     <section class="service-sequence-col">
                         <div class="sequence-panel-header">
                             <div class="panel-heading-wrap">
-                                <h2 class="panel-section-title">Sequence of Operations (SOP)</h2>
+                                <h2 class="panel-section-title">Site Workflow</h2>
                                 <span class="panel-order-chip">#{{ sopData.order_no }}</span>
                             </div>
                             
@@ -634,9 +640,9 @@
                                             <div class="service-heading-wrap">
                                                 <span class="service-seq-badge">{{ s.sequence_order || (i + 1) }}.</span>
                                                 <h3 class="service-title-text">{{ s.service_name || s.subcategory_name }}</h3>
-                                                <span class="service-status-chip" [ngClass]="s.service_status">
+                                                <span class="service-status-chip" [ngClass]="getServiceStatusKey(s)">
                                                     <span class="chip-dot"></span>
-                                                    {{ getStatusText(s.service_status) }}
+                                                    {{ getStatusText(getServiceStatusKey(s)) }}
                                                 </span>
                                             </div>
 
@@ -698,6 +704,7 @@
                                          [class.st-is-completed]="st.status === 'completed'"
                                          [class.st-is-in-progress]="st.status === 'in_progress'"
                                          [class.st-is-pending]="st.status === 'pending'"
+                                         [class.st-is-approval]="st.status === 'approval_pending'"
                                          [draggable]="!isOrderClosed"
                                          (dragstart)="!isOrderClosed && onSubtaskDragStart(s.id, j, $event)"
                                          (dragover)="!isOrderClosed && onSubtaskDragOver($event)"
@@ -763,6 +770,17 @@
                                                     </div>
                                                 </div>
 
+                                                <!-- Comments (customer feedback) -->
+                                                <button type="button" class="btn-st-icon" [class.has-comments]="subtaskCommentCount(st) > 0" [class.needs-changes]="subtaskNeedsChanges(st)" (click)="openSubtaskComments(st, $event)" title="Comments">
+                                                    <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+                                                    <span class="st-icon-count" *ngIf="subtaskCommentCount(st) > 0">{{ subtaskCommentCount(st) }}</span>
+                                                </button>
+
+                                                <!-- Edit -->
+                                                <button *ngIf="canEditSubtask(st)" type="button" class="btn-st-icon" (click)="openEditSubtask(st, s, $event)" title="Edit sub task">
+                                                    <ion-icon name="create-outline"></ion-icon>
+                                                </button>
+
                                                 <!-- View Proof / Details Button -->
                                                 <button type="button" class="btn-st-action-view" (click)="openSubtaskDetails(st, s, $event)" title="View subtask details & completion proof">
                                                     <ion-icon name="eye-outline"></ion-icon>
@@ -770,7 +788,7 @@
                                                 </button>
 
                                                 <!-- Vendor Mark Done Button (if active) -->
-                                                <button *ngIf="!isOrderClosed && st.status !== 'completed'" type="button" class="btn-st-mark-done" (click)="markSubtaskDone(st, s, $event)" title="Mark this subtask as completed">
+                                                <button *ngIf="canMarkSubtaskDone(st)" type="button" class="btn-st-mark-done" (click)="markSubtaskDone(st, s, $event)" title="Send this sub task to the customer for approval">
                                                     <ion-icon name="checkmark"></ion-icon>
                                                     <span>Done</span>
                                                 </button>
@@ -821,10 +839,38 @@
 
                             <!-- Status Badge Pill -->
                             <div class="details-status-badge-wrap">
-                                <span class="status-pill-badge" [ngClass]="selectedSopService.service_status">
+                                <span class="status-pill-badge" [ngClass]="getServiceStatusKey(selectedSopService)">
                                     <span class="badge-dot"></span>
-                                    {{ getStatusText(selectedSopService.service_status) }}
+                                    {{ getStatusText(getServiceStatusKey(selectedSopService)) }}
                                 </span>
+                                <div class="details-header-actions">
+                                    <button type="button" class="btn-details-edit" (click)="openServiceComments(selectedSopService, $event)" title="Comments on this service">
+                                        <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+                                        <span>Comments</span>
+                                    </button>
+                                    <button *ngIf="!isOrderClosed && selectedSopService.service_status !== 'completed'" type="button" class="btn-details-edit" (click)="openEditService(selectedSopService, $event)" title="Edit service dates and description">
+                                        <ion-icon name="create-outline"></ion-icon>
+                                        <span>Edit</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Waiting for the customer's approval -->
+                            <div class="approval-banner vendor-waiting" *ngIf="getServiceStatusKey(selectedSopService) === 'approval_pending'">
+                                <div class="approval-banner-text">
+                                    <strong>Waiting for the customer's approval</strong>
+                                    <span>You'll be notified when the customer approves your work or asks for changes.</span>
+                                </div>
+                            </div>
+
+                            <!-- Customer asked for changes -->
+                            <div class="changes-banner" *ngIf="serviceChangesRequested(selectedSopService) as fb">
+                                <div class="changes-banner-text">
+                                    <strong>Customer requested changes</strong>
+                                    <span class="changes-comment" *ngIf="fb.comment">"{{ fb.comment }}"</span>
+                                    <span class="changes-meta">{{ fb.author_name || 'Customer' }}{{ fb.created_at ? (' · ' + (fb.created_at | date:'dd MMM, h:mm a')) : '' }}</span>
+                                </div>
+                                <button type="button" class="btn-changes-view" (click)="openServiceComments(selectedSopService, $event)">View comments</button>
                             </div>
 
                             <!-- Date Range Form Controls -->
@@ -884,6 +930,14 @@
                                                  {{ getStatusText(st.status) }}
                                              </span>
                                         </div>
+                                        <div class="st-waiting-note" *ngIf="st.status === 'approval_pending'">
+                                            <ion-icon name="hourglass-outline"></ion-icon>
+                                            <span>Customer approval needed. Please wait for the customer to review.</span>
+                                        </div>
+                                        <div class="st-changes-note" *ngIf="subtaskNeedsChanges(st)">
+                                            <ion-icon name="alert-circle-outline"></ion-icon>
+                                            <span>Changes requested: {{ st.comments![st.comments!.length - 1].comment }}</span>
+                                        </div>
 
                                         <div class="st-card-bottom-row">
                                             <div class="st-card-dates-range-wrap" (click)="$event.stopPropagation()">
@@ -905,10 +959,17 @@
                                                 </div>
                                             </div>
                                             <div class="st-card-actions-group">
+                                                <button type="button" class="btn-st-icon" [class.has-comments]="subtaskCommentCount(st) > 0" [class.needs-changes]="subtaskNeedsChanges(st)" (click)="openSubtaskComments(st, $event)" title="Comments">
+                                                    <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+                                                    <span class="st-icon-count" *ngIf="subtaskCommentCount(st) > 0">{{ subtaskCommentCount(st) }}</span>
+                                                </button>
+                                                <button *ngIf="canEditSubtask(st)" type="button" class="btn-st-icon" (click)="openEditSubtask(st, selectedSopService, $event)" title="Edit sub task">
+                                                    <ion-icon name="create-outline"></ion-icon>
+                                                </button>
                                                 <button type="button" class="btn-st-view-action" (click)="openSubtaskDetails(st, selectedSopService, $event)">
                                                     View
                                                 </button>
-                                                <button *ngIf="st.status !== 'completed' && !isOrderClosed" type="button" class="btn-st-mark-done" (click)="completeSubtask(st)">
+                                                <button *ngIf="canMarkSubtaskDone(st)" type="button" class="btn-st-mark-done" (click)="completeSubtask(st, selectedSopService)">
                                                     Mark Done
                                                 </button>
                                             </div>
@@ -921,7 +982,7 @@
                                 </div>
 
                                 <!-- + Add Sub Task Outline Button -->
-                                <button type="button" class="btn-add-subtask-full" (click)="openAddSubtask(selectedSopService)">
+                                <button *ngIf="!isOrderClosed" type="button" class="btn-add-subtask-full" (click)="openAddSubtask(selectedSopService)">
                                     <ion-icon name="add"></ion-icon>
                                     <span>Add Sub Task</span>
                                 </button>
@@ -965,7 +1026,7 @@
 <div class="sop-modal-backdrop" *ngIf="showAddSubtaskModal" (click)="closeAddSubtaskModal()">
     <div class="sop-modal-card" (click)="$event.stopPropagation()">
         <div class="modal-card-header">
-            <h3 class="modal-card-title">Add Sub Task</h3>
+            <h3 class="modal-card-title">{{ editingSubtask ? 'Edit Sub Task' : 'Add Sub Task' }}</h3>
             <button type="button" class="modal-close-btn" (click)="closeAddSubtaskModal()">
                 <ion-icon name="close"></ion-icon>
             </button>
@@ -978,7 +1039,7 @@
                 </div>
                 <div class="form-field-group">
                     <label class="form-label">Start Date</label>
-                    <input type="date" [(ngModel)]="newSubtask.start_date" class="form-text-input" />
+                    <input type="date" [(ngModel)]="newSubtask.start_date" [max]="newSubtask.end_date || null" class="form-text-input" />
                 </div>
                 <div class="form-field-group full-width-field">
                     <label class="form-label">Description</label>
@@ -986,13 +1047,14 @@
                 </div>
                 <div class="form-field-group">
                     <label class="form-label">End Date</label>
-                    <input type="date" [(ngModel)]="newSubtask.end_date" class="form-text-input" />
+                    <input type="date" [(ngModel)]="newSubtask.end_date" [min]="newSubtask.start_date || null" class="form-text-input" [class.input-invalid]="!!subtaskDateError" />
+                    <span class="field-error" *ngIf="subtaskDateError">{{ subtaskDateError }}</span>
                 </div>
                 <div class="form-field-group">
                     <label class="form-label">Notify Next Service (Vendor)</label>
-                    <select [(ngModel)]="newSubtask.next_order_service_id" class="form-text-input" style="height: 42px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; padding: 0 10px; font-size: 13px; color: #111827; width: 100%;">
+                    <select [(ngModel)]="newSubtask.next_order_service_id" class="form-text-input form-select-input">
                         <option [ngValue]="null">-- Select Next Vendor/Service --</option>
-                        <option *ngFor="let svc of getAvailableNextServices()" [value]="svc.id">
+                        <option *ngFor="let svc of getAvailableNextServices()" [ngValue]="svc.id">
                             {{ svc.service_name || svc.subcategory_name }} ({{ svc.vendor_name || 'Vendor #' + svc.vendor_id }})
                         </option>
                     </select>
@@ -1001,9 +1063,9 @@
         </div>
         <div class="modal-card-footer">
             <button type="button" class="btn-footer-cancel" (click)="closeAddSubtaskModal()">Cancel</button>
-            <button type="button" class="btn-footer-save" [disabled]="!newSubtask.title.trim() || isSavingSubtask" (click)="saveSubtask()">
+            <button type="button" class="btn-footer-save" [disabled]="!newSubtask.title.trim() || !!subtaskDateError || isSavingSubtask" (click)="saveSubtask()">
                 <ion-spinner *ngIf="isSavingSubtask" name="crescent"></ion-spinner>
-                <span *ngIf="!isSavingSubtask">Save Subtask</span>
+                <span *ngIf="!isSavingSubtask">{{ editingSubtask ? 'Save Changes' : 'Save Subtask' }}</span>
             </button>
         </div>
     </div>
@@ -1056,8 +1118,16 @@
                 </div>
             </div>
         </div>
-        <div class="modal-card-footer">
+        <div class="modal-card-footer wrap-footer">
             <button type="button" class="btn-footer-cancel" (click)="closeSubtaskDetailsModal()">Close</button>
+            <button type="button" class="btn-footer-secondary" (click)="openSubtaskComments(selectedSubtask, $event)">
+                <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+                <span>Comments{{ subtaskCommentCount(selectedSubtask) ? ' (' + subtaskCommentCount(selectedSubtask) + ')' : '' }}</span>
+            </button>
+            <button *ngIf="canEditSubtask(selectedSubtask)" type="button" class="btn-footer-secondary" (click)="openEditSubtask(selectedSubtask, selectedSubtaskService, $event)">
+                <ion-icon name="create-outline"></ion-icon>
+                <span>Edit</span>
+            </button>
         </div>
     </div>
 </div>
@@ -1102,7 +1172,7 @@
                             <ion-icon name="camera-outline"></ion-icon>
                             <span>Completion Proof Image *</span>
                         </label>
-                        <span class="mandatory-badge">Required to mark Done</span>
+                        <span class="mandatory-badge">Required to submit</span>
                     </div>
 
                     <!-- Hidden file and camera inputs -->
@@ -1168,11 +1238,83 @@
             <button type="button" class="btn-footer-save btn-complete-submit" 
                     [disabled]="!completionImageFile || isCompletingSubtask" 
                     (click)="submitCompleteSubtask()"
-                    [title]="!completionImageFile ? 'Please choose or click an image before marking Done' : 'Complete this subtask'">
+                    [title]="!completionImageFile ? 'Please choose or click an image before submitting' : 'Send this sub task to the customer for approval'">
                 <ion-spinner *ngIf="isCompletingSubtask" name="crescent"></ion-spinner>
                 <ion-icon *ngIf="!isCompletingSubtask" name="checkmark-done-outline"></ion-icon>
-                <span *ngIf="!isCompletingSubtask">Submit & Mark Done</span>
+                <span *ngIf="!isCompletingSubtask">Submit for Approval</span>
                 <span *ngIf="isCompletingSubtask">Submitting...</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: COMMENTS (customer feedback and replies) -->
+<div class="sop-modal-backdrop" *ngIf="showCommentsModal && commentsTarget" (click)="closeCommentsModal()">
+    <div class="sop-modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-card-header">
+            <h3 class="modal-card-title">Comments · {{ commentsTarget.title }}</h3>
+            <button type="button" class="modal-close-btn" (click)="closeCommentsModal()">
+                <ion-icon name="close"></ion-icon>
+            </button>
+        </div>
+        <div class="modal-card-body">
+            <div class="comment-thread">
+                <div class="comment-item" *ngFor="let c of commentsList" [ngClass]="'kind-' + (c.kind || 'comment')">
+                    <div class="comment-meta">
+                        <strong>{{ c.author_name || (c.author_type === 'vendor' ? 'You' : 'Customer') }}</strong>
+                        <span class="comment-kind">{{ getCommentKindLabel(c.kind) }}</span>
+                        <span class="comment-time" *ngIf="c.created_at">{{ c.created_at | date:'dd MMM, h:mm a' }}</span>
+                    </div>
+                    <p class="comment-text" *ngIf="c.comment">{{ c.comment }}</p>
+                </div>
+                <p class="comment-empty" *ngIf="commentsList.length === 0">No comments yet.</p>
+            </div>
+
+            <div class="form-field-group full-width-field" *ngIf="commentsTarget.kind === 'subtask' && !isOrderClosed" style="margin-top: 14px;">
+                <label class="form-label">Reply to the customer</label>
+                <textarea [(ngModel)]="newComment" rows="3" placeholder="Write a comment..." class="form-textarea-input"></textarea>
+            </div>
+        </div>
+        <div class="modal-card-footer">
+            <button type="button" class="btn-footer-cancel" (click)="closeCommentsModal()" [disabled]="isPostingComment">Close</button>
+            <button *ngIf="commentsTarget.kind === 'subtask' && !isOrderClosed" type="button" class="btn-footer-save" [disabled]="!newComment.trim() || isPostingComment" (click)="postComment()">
+                <ion-spinner *ngIf="isPostingComment" name="crescent"></ion-spinner>
+                <span *ngIf="!isPostingComment">Post Comment</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: EDIT SERVICE -->
+<div class="sop-modal-backdrop" *ngIf="showEditServiceModal && editServiceTarget" (click)="closeEditServiceModal()">
+    <div class="sop-modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-card-header">
+            <h3 class="modal-card-title">Edit · {{ editServiceTarget.service_name || editServiceTarget.subcategory_name }}</h3>
+            <button type="button" class="modal-close-btn" (click)="closeEditServiceModal()">
+                <ion-icon name="close"></ion-icon>
+            </button>
+        </div>
+        <div class="modal-card-body">
+            <div class="modal-form-grid">
+                <div class="form-field-group">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" [(ngModel)]="editServiceForm.start_date" class="form-text-input" />
+                </div>
+                <div class="form-field-group">
+                    <label class="form-label">End Date</label>
+                    <input type="date" [(ngModel)]="editServiceForm.end_date" class="form-text-input" />
+                </div>
+                <div class="form-field-group full-width-field">
+                    <label class="form-label">Description</label>
+                    <textarea [(ngModel)]="editServiceForm.description" rows="3" placeholder="Describe this phase of the work" class="form-textarea-input"></textarea>
+                </div>
+            </div>
+        </div>
+        <div class="modal-card-footer">
+            <button type="button" class="btn-footer-cancel" (click)="closeEditServiceModal()" [disabled]="isSavingService">Cancel</button>
+            <button type="button" class="btn-footer-save" [disabled]="isSavingService" (click)="saveEditedService()">
+                <ion-spinner *ngIf="isSavingService" name="crescent"></ion-spinner>
+                <span *ngIf="!isSavingService">Save Changes</span>
             </button>
         </div>
     </div>

@@ -630,7 +630,7 @@ export class VendorPortalPage implements OnInit, OnDestroy {
                     message: `You are now joined in the live Project Communication Group with the customer. Customer contact details are now unlocked.`,
                     buttons: [
                         {
-                            text: 'View Project Group Chat',
+                            text: 'View Project Discussions',
                             handler: () => {
                                 this.openChatForOrder(item);
                             }
@@ -702,7 +702,7 @@ export class VendorPortalPage implements OnInit, OnDestroy {
             return;
         }
         if (orderItem.vendor_status !== 'accepted') {
-            this.showToast('You must accept the service request first to participate in the project chat.', 'warning');
+            this.showToast('You must accept the service request first to participate in Project Discussions.', 'warning');
             return;
         }
 
@@ -993,7 +993,7 @@ export class VendorPortalPage implements OnInit, OnDestroy {
             error: (err) => {
                 console.error('Failed to load SOP details for vendor:', err);
                 this.loadingSop = false;
-                this.showToast(err?.error?.message || 'Could not load order SOP details.', 'danger');
+                this.showToast(err?.error?.message || 'Could not load Site Workflow details.', 'danger');
             }
         });
     }
