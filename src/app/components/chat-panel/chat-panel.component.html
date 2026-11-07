@@ -1,0 +1,1179 @@
+<div class="chat-drawer-overlay" [class.open]="isOpen" (click)="close.emit()">
+    <div class="chat-drawer-container" [class.mobile-active-conv]="!!activeConversation" (click)="$event.stopPropagation()">
+        <!-- LEFT PANE: Group / Order List -->
+        <div class="chat-left-pane">
+            <!-- Left Header -->
+            <div class="left-header">
+                <div class="app-branding">
+                    <div class="engineer-cap-badge">
+                        <ion-icon name="construct"></ion-icon>
+                    </div>
+                    <div class="branding-meta">
+                        <h3 class="branding-title">Project Groups</h3>
+                        <span class="branding-sub">Direct Project Comms</span>
+                    </div>
+                </div>
+
+                <button type="button" class="drawer-close-btn" (click)="close.emit()" aria-label="Close Chat">
+                    <ion-icon name="close"></ion-icon>
+                </button>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="chat-search-wrap">
+                <div class="search-input-box">
+                    <ion-icon name="search-outline"></ion-icon>
+                    <input type="text" [(ngModel)]="searchQuery" (input)="applySearch()" placeholder="Search project, order, service..." />
+                    <button *ngIf="searchQuery" type="button" class="clear-search-btn" (click)="searchQuery = ''; applySearch()">
+                        <ion-icon name="close-circle"></ion-icon>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Conversations List -->
+            <div class="conversations-scroll">
+                <!-- Empty state if no groups -->
+                <div *ngIf="filteredConversations.length === 0" class="no-groups-state">
+                    <ion-icon name="chatbubbles-outline"></ion-icon>
+                    <p class="state-title">No Service Projects</p>
+                    <p class="state-desc">Only orders with accepted services have dedicated communication groups.</p>
+                </div>
+
+                <!-- ONGOING PROJECTS SECTION -->
+                <div class="section-group" *ngIf="ongoingConversations.length > 0">
+                    <div class="section-title-row">
+                        <span class="dot live-dot"></span>
+                        <span class="section-heading">ONGOING PROJECTS ({{ ongoingConversations.length }})</span>
+                    </div>
+
+                    <div class="conv-card" *ngFor="let c of ongoingConversations"
+                        [class.active]="activeConversation?.id === c.id"
+                        (click)="selectConversation(c)">
+                        <div class="conv-avatar">
+                            <ion-icon name="business"></ion-icon>
+                        </div>
+                        <div class="conv-body">
+                            <div class="conv-top-row">
+                                <span class="conv-title">{{ c.title || ('Project #' + c.order_no) }}</span>
+                                <span class="conv-time" *ngIf="c.last_message_at">{{ c.last_message_at | date:'shortTime' }}</span>
+                            </div>
+
+                            <div class="order-tag-row">
+                                <span class="order-chip">#{{ c.order_no }}</span>
+                                <span class="service-pill" *ngFor="let s of (c.services || []).slice(0, 2)">
+                                    {{ s.subcategory_name }}
+                                </span>
+                                <span class="more-pill" *ngIf="(c.services || []).length > 2">+{{ (c.services || []).length - 2 }}</span>
+                            </div>
+
+                            <div class="conv-bottom-row">
+                                <p class="last-msg-text">
+                                    <span class="sender-name" *ngIf="c.last_sender_name">{{ c.last_sender_name }}: </span>
+                                    {{ c.last_message || 'Project group created' }}
+                                </p>
+                                <span class="unread-pill" *ngIf="c.unread_count && c.unread_count > 0">
+                                    {{ c.unread_count }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COMPLETED PROJECTS SECTION -->
+                <div class="section-group completed-group" *ngIf="completedConversations.length > 0">
+                    <div class="section-title-row">
+                        <span class="dot done-dot"></span>
+                        <span class="section-heading">COMPLETED PROJECTS ({{ completedConversations.length }})</span>
+                    </div>
+
+                    <div class="conv-card" *ngFor="let c of completedConversations"
+                        [class.active]="activeConversation?.id === c.id"
+                        (click)="selectConversation(c)">
+                        <div class="conv-avatar completed-avatar">
+                            <ion-icon name="checkmark-done"></ion-icon>
+                        </div>
+                        <div class="conv-body">
+                            <div class="conv-top-row">
+                                <span class="conv-title">{{ c.title || ('Project #' + c.order_no) }}</span>
+                                <span class="conv-time" *ngIf="c.last_message_at">{{ c.last_message_at | date:'shortDate' }}</span>
+                            </div>
+                            <div class="order-tag-row">
+                                <span class="order-chip">#{{ c.order_no }}</span>
+                                <span class="status-pill status-completed">Delivered</span>
+                            </div>
+                            <div class="conv-bottom-row">
+                                <p class="last-msg-text text-muted">Project concluded</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT PANE: Chat Conversation or Embedded SOP -->
+        <div class="chat-right-pane" *ngIf="activeConversation">
+            <!-- Tier 1: Main Header (Title, Status, Actions, About, Close) -->
+            <div class="right-header-bar">
+                <div class="header-left-col">
+                    <button type="button" class="btn-mobile-back" (click)="activeConversation = null" aria-label="Back to conversations" title="Back to project groups">
+                        <ion-icon name="arrow-back"></ion-icon>
+                    </button>
+
+                    <div class="header-project-identity">
+                        <div class="title-status-line">
+                            <h2 class="project-title">{{ activeConversation.title || ('Project Order #' + activeConversation.order_no) }}</h2>
+                            <span class="order-status-badge" [class.live]="!isOrderClosed">
+                                <span class="badge-dot"></span>
+                                {{ (isOrderClosed ? 'DELIVERED' : (activeConversation.order_status || 'Active')) | uppercase }}
+                            </span>
+                        </div>
+                        <div class="order-meta-subtitle">
+                            <span>Order #{{ activeConversation.order_no }}</span>
+                            <span class="meta-dot">•</span>
+                            <span>{{ (activeConversation.services || []).length }} Assigned Trade{{ (activeConversation.services || []).length === 1 ? '' : 's' }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-right-actions">
+                    <!-- About Button with Dropdown (Details of who is in the group chat) -->
+                    <div class="about-button-wrapper">
+                        <button type="button" class="btn-group-about" (click)="toggleAboutDropdown()" [class.active]="showAboutDropdown" title="Group Details & Members">
+                            <ion-icon name="information-circle-outline"></ion-icon>
+                            <span>About</span>
+                            <ion-icon name="chevron-down-outline" class="chevron-icon"></ion-icon>
+                        </button>
+
+                        <div class="about-dropdown-backdrop" *ngIf="showAboutDropdown" (click)="closeAboutDropdown()"></div>
+
+                        <!-- About Dropdown Panel -->
+                        <div class="group-about-dropdown" *ngIf="showAboutDropdown" (click)="$event.stopPropagation()">
+                            <div class="about-dropdown-header">
+                                <div class="dropdown-title-row">
+                                    <ion-icon name="people"></ion-icon>
+                                    <h4>Group Details & Members</h4>
+                                </div>
+                                <button type="button" class="close-about-btn" (click)="closeAboutDropdown()">
+                                    <ion-icon name="close"></ion-icon>
+                                </button>
+                            </div>
+
+                            <div class="about-dropdown-content">
+                                <!-- Client Section -->
+                                <div class="about-group-block">
+                                    <span class="block-label">PROJECT CLIENT</span>
+                                    <div class="member-card client-card">
+                                        <div class="member-avatar client-avatar">
+                                            <ion-icon name="person"></ion-icon>
+                                        </div>
+                                        <div class="member-meta">
+                                            <strong class="member-name">{{ clientDisplayName }}</strong>
+                                            <span class="member-sub">{{ activeConversation.customer_organization || 'Project Owner' }}</span>
+                                        </div>
+                                        <span class="role-pill client-role">Client</span>
+                                    </div>
+                                </div>
+
+                                <!-- Vendors & Services Section -->
+                                <div class="about-group-block">
+                                    <div class="block-header-line">
+                                        <span class="block-label">ASSIGNED VENDORS & SERVICES</span>
+                                        <span class="badge-total">{{ (activeConversation.services || []).length }}</span>
+                                    </div>
+
+                                    <div class="vendors-scroll-list">
+                                        <div class="member-card vendor-card" *ngFor="let s of activeConversation.services">
+                                            <div class="member-avatar vendor-avatar">
+                                                <ion-icon name="construct"></ion-icon>
+                                            </div>
+                                            <div class="member-meta">
+                                                <strong class="member-name">{{ s.subcategory_name || s.service_name }}</strong>
+                                                <span class="member-sub" *ngIf="s.vendor_name">
+                                                    <ion-icon name="business-outline"></ion-icon>
+                                                    {{ s.vendor_name }}
+                                                </span>
+                                                <span class="member-dates" *ngIf="s.start_date">
+                                                    {{ s.start_date | date:'dd MMM yyyy' }} {{ s.end_date ? ('- ' + (s.end_date | date:'dd MMM yyyy')) : '' }}
+                                                </span>
+                                            </div>
+                                            <div class="member-status-col">
+                                                <span class="status-pill-badge" [ngClass]="s.service_status">
+                                                    <span *ngIf="s.service_status === 'completed'">✅ Completed</span>
+                                                    <span *ngIf="s.service_status !== 'completed' && s.vendor_status === 'accepted'">🟢 Ongoing</span>
+                                                    <span *ngIf="s.service_status !== 'completed' && s.vendor_status !== 'accepted'">⏳ Pending</span>
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div class="empty-trades-note" *ngIf="!activeConversation.services || activeConversation.services.length === 0">
+                                            <p>No assigned trades on this order.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vendor: Submit Work Completed Button -->
+                    <button *ngIf="!isOrderClosed && canRequestCompletion"
+                            type="button" 
+                            class="btn-vendor-request-completion"
+                            (click)="promptRequestCompletion()"
+                            title="Submit that work has completed and raise acceptance request to customer">
+                        <ion-icon name="checkmark-done-circle"></ion-icon>
+                        <span>Submit Work Completed</span>
+                    </button>
+
+                    <!-- Vendor: Work Completed Badge -->
+                    <span *ngIf="!isOrderClosed && isMyWorkCompleted" class="badge-vendor-work-done">
+                        <ion-icon name="checkmark-circle"></ion-icon>
+                        <span>Work Completed</span>
+                    </span>
+
+                    <!-- Completed Badge if Project is Delivered/Completed -->
+                    <span *ngIf="isOrderClosed" class="badge-order-closed">
+                        <ion-icon name="checkmark-done-circle"></ion-icon>
+                        <span>Project Completed</span>
+                    </span>
+
+                    <!-- Chat / SOP Top Header Segmented Toggle -->
+                    <div class="header-chat-sop-segmented" title="Switch between Chat and SOP for this order">
+                        <button type="button" class="tab-pill-btn" [class.active]="activeViewTab === 'chat'" (click)="setViewTab('chat')" title="View Chat Messages">
+                            <span>chat</span>
+                        </button>
+                        <button type="button" class="tab-pill-btn" [class.active]="activeViewTab === 'sop'" (click)="setViewTab('sop')" title="View Sequence of Operations (SOP)">
+                            <span>sop</span>
+                        </button>
+                    </div>
+
+                    <!-- Right Header Close Button -->
+                    <button type="button" class="drawer-close-btn right-close-btn" (click)="close.emit()" aria-label="Close Chat" title="Close Chat">
+                        <ion-icon name="close"></ion-icon>
+                    </button>
+                </div>
+            </div>
+
+            <!-- VIEW 1: CHAT THREAD VIEW (activeViewTab === 'chat') -->
+            <ng-container *ngIf="activeViewTab === 'chat'">
+                <!-- Messages Thread Area -->
+                <div class="messages-viewport" #messagesContainer>
+                    <!-- Initial Welcome / Security Banner -->
+                    <div class="thread-welcome-banner">
+                        <ion-icon name="shield-checkmark"></ion-icon>
+                        <div class="banner-text">
+                            <strong>End-to-End CivilWorks Project Group</strong>
+                            <p>Messages, site plans, voice notes, measurements, and invoices sent here are visible to accepted vendors and project coordinators.</p>
+                        </div>
+                    </div>
+
+                    <!-- Message Bubbles -->
+                    <div class="message-row" *ngFor="let m of messages"
+                        [ngClass]="{
+                            'msg-system': m.message_type === 'system' || m.sender_type === 'system',
+                            'msg-self': isMyMessage(m),
+                            'msg-other': !isMyMessage(m) && m.message_type !== 'system' && m.sender_type !== 'system',
+                            'msg-customer': m.sender_type === 'customer',
+                            'msg-vendor': m.sender_type === 'vendor'
+                        }">
+
+                        <!-- Interactive Completion Request Card -->
+                        <div class="completion-request-card" *ngIf="isCompletionRequestMessage(m)">
+                            <div class="cr-top">
+                                <div class="cr-badge">
+                                    <ion-icon name="ribbon-outline"></ion-icon>
+                                    <span>Work Completion Request</span>
+                                </div>
+                                <span class="cr-time" *ngIf="m.created_at">{{ m.created_at | date:'shortTime' }}</span>
+                            </div>
+                            
+                            <div class="cr-body">
+                                <p class="cr-title">
+                                    <strong>{{ getCompletionReqVendorName(m) }}</strong> has completed work for <strong>{{ getCompletionReqServiceName(m) }}</strong> and requested completion acceptance.
+                                </p>
+                            </div>
+
+                            <!-- Vendor Status Display -->
+                            <div class="cr-footer">
+                                <div *ngIf="!isServiceMarkedCompleted(m) && !isOrderClosed" class="cr-status-waiting">
+                                    <ion-icon name="hourglass-outline"></ion-icon>
+                                    <span>Sent to Client — Awaiting Acceptance</span>
+                                </div>
+                                <div *ngIf="isServiceMarkedCompleted(m) || isOrderClosed" class="cr-status-done">
+                                    <ion-icon name="checkmark-circle"></ion-icon>
+                                    <span>Work Accepted & Marked Completed</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Work Completed Notice Card -->
+                        <div class="work-completed-card" *ngIf="isWorkCompletedMessage(m)">
+                            <ion-icon name="checkmark-done-circle"></ion-icon>
+                            <div class="wc-text">
+                                <strong>Service Work Completed</strong>
+                                <p>{{ m.content }}</p>
+                            </div>
+                            <span class="wc-time" *ngIf="m.created_at">{{ m.created_at | date:'shortTime' }}</span>
+                        </div>
+
+                        <!-- Standard System Event Pill -->
+                        <div class="system-bubble" *ngIf="(m.message_type === 'system' || m.sender_type === 'system') && !isCompletionRequestMessage(m) && !isWorkCompletedMessage(m)">
+                            <ion-icon name="information-circle"></ion-icon>
+                            <span>{{ m.content }}</span>
+                            <span class="system-time" *ngIf="m.created_at">{{ m.created_at | date:'shortTime' }}</span>
+                        </div>
+
+                        <!-- User / Vendor Chat Bubble -->
+                        <div class="chat-bubble" *ngIf="m.message_type !== 'system' && m.sender_type !== 'system' && !isCompletionRequestMessage(m) && !isWorkCompletedMessage(m)">
+                            <div class="bubble-sender-title" *ngIf="!isMyMessage(m)">
+                                <ion-icon [name]="m.sender_type === 'vendor' ? 'build-outline' : 'person-outline'"></ion-icon>
+                                <span>{{ m.sender_name || (m.sender_type === 'customer' ? 'Customer' : 'Vendor Partner') }}</span>
+                            </div>
+
+                            <!-- TEXT MESSAGE -->
+                            <p class="bubble-text" *ngIf="m.message_type === 'text'">{{ m.content }}</p>
+
+                            <!-- IMAGE ATTACHMENT -->
+                            <div class="attachment-image-card" *ngIf="isImageMessage(m)" (click)="openImagePreview(m)">
+                                <img [src]="getMediaUrl(m)" [alt]="m.attachment_name || m.file_name || 'Attached Image'" loading="lazy" />
+                                <div class="image-overlay-hint">
+                                    <ion-icon name="scan-outline"></ion-icon>
+                                    <span>Click to enlarge</span>
+                                </div>
+                            </div>
+
+                            <!-- VIDEO ATTACHMENT -->
+                            <div class="attachment-video-card" *ngIf="isVideoMessage(m)">
+                                <video [src]="getMediaUrl(m)" controls preload="metadata"></video>
+                            </div>
+
+                            <!-- AUDIO / VOICE NOTE ATTACHMENT -->
+                            <div class="attachment-audio-card" *ngIf="isAudioMessage(m)">
+                                <div class="audio-header">
+                                    <ion-icon name="mic"></ion-icon>
+                                    <span>Voice Note</span>
+                                </div>
+                                <audio [src]="getMediaUrl(m)" controls preload="metadata"></audio>
+                            </div>
+
+                            <!-- DOCUMENT ATTACHMENT -->
+                            <div class="attachment-doc-card" *ngIf="isDocMessage(m)">
+                                <div class="doc-icon-wrap" [ngClass]="getDocIconClass(m)">
+                                    <ion-icon [name]="getDocIcon(m)"></ion-icon>
+                                </div>
+                                <div class="doc-info-col">
+                                    <span class="doc-name">{{ m.attachment_name || m.file_name || m.content || 'Attached File' }}</span>
+                                    <span class="doc-size" *ngIf="m.attachment_size || m.file_size">{{ formatFileSize(m.attachment_size || m.file_size) }}</span>
+                                </div>
+                                <a [href]="getMediaUrl(m)" target="_blank" download class="btn-download-doc" title="Download Document">
+                                    <ion-icon name="download-outline"></ion-icon>
+                                </a>
+                            </div>
+
+                            <!-- Bubble Timestamp & Read Indicator -->
+                            <div class="bubble-meta">
+                                <span class="bubble-time">{{ (m.created_at || 'just now') | date:'shortTime' }}</span>
+                                <ion-icon *ngIf="isMyMessage(m)" name="checkmark-done" class="read-ticks" [class.read]="m.is_read"></ion-icon>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LOCKED BANNER: Shown when project is completed OR vendor work completed -->
+                <div class="chat-locked-banner" *ngIf="isOrderClosed">
+                    <div class="locked-icon-badge">
+                        <ion-icon name="lock-closed"></ion-icon>
+                    </div>
+                    <div class="locked-text-wrap">
+                        <h4 class="locked-title">Project Order Completed</h4>
+                        <p class="locked-desc">This project has been marked as completed. Messaging in this group is closed for all participants. Chat history, photos, voice notes, and documents are preserved.</p>
+                    </div>
+                </div>
+
+                <div class="chat-locked-banner vendor-locked-banner" *ngIf="!isOrderClosed && isMyWorkCompleted">
+                    <div class="locked-icon-badge">
+                        <ion-icon name="checkmark-circle"></ion-icon>
+                    </div>
+                    <div class="locked-text-wrap">
+                        <h4 class="locked-title">Your Work Completed</h4>
+                        <p class="locked-desc">Your assigned trade work has been marked as completed. Messaging has concluded for this trade, but full project history is viewable.</p>
+                    </div>
+                </div>
+
+                <!-- COMPOSER: Message Input Area (Shown only when NOT completed) -->
+                <div class="chat-composer-box" *ngIf="!isOrderClosed && !isMyWorkCompleted">
+                    <!-- Live Voice Recording Bar -->
+                    <div class="voice-recording-bar" *ngIf="isRecordingVoice">
+                        <div class="rec-indicator">
+                            <span class="rec-dot"></span>
+                            <span class="rec-label">Recording Voice Note...</span>
+                        </div>
+                        <span class="rec-timer">{{ recordingDurationFormatted }}</span>
+                        <div class="rec-actions">
+                            <button type="button" class="btn-cancel-rec" (click)="cancelVoiceRecording()" title="Cancel Recording">
+                                <ion-icon name="trash-outline"></ion-icon>
+                            </button>
+                            <button type="button" class="btn-send-rec" (click)="stopVoiceRecordingAndSend()" title="Send Voice Note">
+                                <ion-icon name="send"></ion-icon>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Standard Composer Toolbar & Inputs -->
+                    <ng-container *ngIf="!isRecordingVoice">
+                        <!-- Attachment Menu Trigger (+) -->
+                        <div class="attach-btn-wrap">
+                            <button type="button" class="composer-icon-btn attach-toggle-btn" 
+                                    [class.active]="showAttachMenu"
+                                    (click)="openAttachmentMenu()" 
+                                    title="Add photos, videos, voice note, or site documents"
+                                    aria-label="Attach file">
+                                <ion-icon [name]="showAttachMenu ? 'close' : 'add'"></ion-icon>
+                            </button>
+
+                            <!-- Backdrop click overlay for closing attachment menu -->
+                            <div class="whatsapp-attach-backdrop" *ngIf="showAttachMenu" (click)="showAttachMenu = false"></div>
+
+                            <!-- WhatsApp-Style Pop-up Attachment Menu -->
+                            <div class="whatsapp-attach-popup" *ngIf="showAttachMenu">
+                                <button type="button" class="attach-menu-item" (click)="triggerUpload('image')">
+                                    <div class="menu-icon-box bg-purple">
+                                        <ion-icon name="image"></ion-icon>
+                                    </div>
+                                    <span>Photos</span>
+                                </button>
+
+                                <button type="button" class="attach-menu-item" (click)="triggerUpload('video')">
+                                    <div class="menu-icon-box bg-indigo">
+                                        <ion-icon name="videocam"></ion-icon>
+                                    </div>
+                                    <span>Videos</span>
+                                </button>
+
+                                <button type="button" class="attach-menu-item" (click)="triggerUpload('audio')">
+                                    <div class="menu-icon-box bg-amber">
+                                        <ion-icon name="musical-notes"></ion-icon>
+                                    </div>
+                                    <span>Audio</span>
+                                </button>
+
+                                <button type="button" class="attach-menu-item" (click)="triggerUpload('doc')">
+                                    <div class="menu-icon-box bg-red">
+                                        <ion-icon name="document-text"></ion-icon>
+                                    </div>
+                                    <span>Document / PDF</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Hidden file inputs -->
+                        <input type="file" #fileInputImage accept="image/*" class="sr-only" (change)="onFileSelected($event, 'image')" />
+                        <input type="file" #fileInputVideo accept="video/*" class="sr-only" (change)="onFileSelected($event, 'video')" />
+                        <input type="file" #fileInputAudio accept="audio/*" class="sr-only" (change)="onFileSelected($event, 'audio')" />
+                        <input type="file" #fileInputDoc accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" class="sr-only" (change)="onFileSelected($event, 'doc')" />
+
+                        <!-- Text Input -->
+                        <div class="composer-input-wrap">
+                            <input type="text" [(ngModel)]="messageText" (keyup.enter)="sendTextMessage()"
+                                placeholder="Type a message to client..." 
+                                class="composer-input" />
+                        </div>
+
+                        <!-- Voice Record Button -->
+                        <button type="button" class="composer-icon-btn voice-btn" (click)="startVoiceRecording()" title="Record Voice Message" aria-label="Record voice">
+                            <ion-icon name="mic"></ion-icon>
+                        </button>
+
+                        <!-- Send Button -->
+                        <button type="button" class="send-btn" [disabled]="!messageText.trim() || isUploading" (click)="sendTextMessage()" aria-label="Send message">
+                            <ion-icon name="send"></ion-icon>
+                        </button>
+                    </ng-container>
+                </div>
+            </ng-container>
+
+            <!-- VIEW 2: EMBEDDED SOP SEQUENCE VIEW (activeViewTab === 'sop') -->
+            <div class="sop-embedded-view" *ngIf="activeViewTab === 'sop'">
+                <!-- Top Order Summary / Completed Executive Showcase Bar -->
+                <div class="completed-order-showcase-card" *ngIf="isOrderClosed && sopData">
+                    <div class="showcase-top-row">
+                        <div class="showcase-badge">
+                            <ion-icon name="checkmark-done-circle"></ion-icon>
+                            <span>PROJECT ORDER COMPLETED & DELIVERED</span>
+                        </div>
+                        <div class="showcase-completion-date">
+                            <ion-icon name="calendar-outline"></ion-icon>
+                            <span>Completed: <strong>{{ completedOrderDate ? (completedOrderDate | date:'dd MMM yyyy, h:mm a') : (sopData.created_at | date:'dd MMM yyyy') }}</strong></span>
+                        </div>
+                    </div>
+                    <div class="showcase-meta-grid">
+                        <div class="sc-meta-item">
+                            <span class="sc-lbl">PROJECT ORDER</span>
+                            <strong class="sc-val">#{{ sopData.order_no }}</strong>
+                        </div>
+                        <div class="sc-meta-item">
+                            <span class="sc-lbl">CLIENT / CUSTOMER</span>
+                            <strong class="sc-val">{{ sopData.customer_organization || sopData.customer_name || 'Customer' }}</strong>
+                        </div>
+                        <div class="sc-meta-item">
+                            <span class="sc-lbl">TRADE PARTNER</span>
+                            <strong class="sc-val">{{ sopData.vendor?.name || 'Partner' }}</strong>
+                        </div>
+                        <div class="sc-meta-item">
+                            <span class="sc-lbl">STATUS</span>
+                            <strong class="sc-val text-success">All Services Concluded</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Ongoing Order Summary Bar -->
+                <div class="sop-emb-order-bar" *ngIf="!isOrderClosed && sopData">
+                    <div class="emb-info-cell">
+                        <span class="emb-lbl">PROJECT ORDER</span>
+                        <strong class="emb-val">#{{ sopData.order_no }}</strong>
+                    </div>
+                    <div class="emb-info-cell">
+                        <span class="emb-lbl">CUSTOMER / CLIENT</span>
+                        <strong class="emb-val">{{ sopData.customer_organization || sopData.customer_name || 'Customer' }}</strong>
+                    </div>
+                    <div class="emb-info-cell">
+                        <span class="emb-lbl">ASSIGNED PARTNER</span>
+                        <strong class="emb-val">{{ sopData.vendor?.name || 'Partner' }}</strong>
+                    </div>
+                    <div class="emb-info-cell">
+                        <span class="emb-lbl">ORDER DATE</span>
+                        <strong class="emb-val">{{ sopData.created_at | date:'dd MMM yyyy' }}</strong>
+                    </div>
+                </div>
+
+                <!-- Loading Skeleton -->
+                <div class="sop-emb-loading" *ngIf="loadingSop && (!sopData || !sopData.services || sopData.services.length === 0)">
+                    <ion-spinner name="crescent"></ion-spinner>
+                    <span>Loading Sequence of Operations...</span>
+                </div>
+
+                <!-- Empty State -->
+                <div class="sop-emb-empty" *ngIf="!loadingSop && (!sopData || !sopData.services || sopData.services.length === 0)">
+                    <ion-icon name="clipboard-outline"></ion-icon>
+                    <h4>No Assigned Services in Sequence</h4>
+                    <p>Services assigned to your vendor account will appear here in chronological sequence.</p>
+                </div>
+
+                <!-- Two-Column Main Workspace -->
+                <div class="sop-two-column-grid" *ngIf="sopData && sopData.services && sopData.services.length > 0">
+                    <!-- LEFT COLUMN: CONTINUOUS VERTICAL STEPPER TIMELINE -->
+                    <section class="service-sequence-col">
+                        <div class="sequence-panel-header">
+                            <div class="panel-heading-wrap">
+                                <h2 class="panel-section-title">Sequence of Operations (SOP)</h2>
+                                <span class="panel-order-chip">#{{ sopData.order_no }}</span>
+                            </div>
+                            
+                            <!-- Status Color Combinations Legend: Green, Orange, White -->
+                            <div class="status-legend-bar">
+                                <span class="legend-item" title="Work Completed">
+                                    <span class="legend-circle circle-completed"></span>
+                                    <span>Completed</span>
+                                </span>
+                                <span class="legend-item" title="Work In Process">
+                                    <span class="legend-circle circle-in-progress"></span>
+                                    <span>In Process</span>
+                                </span>
+                                <span class="legend-item" title="Work Not Yet Started">
+                                    <span class="legend-circle circle-pending"></span>
+                                    <span>Not Started</span>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Continuous Unified Stepper Track Container (Flipkart Order Tracking Style) -->
+                        <div class="stepper-timeline-container unified-spine-stepper">
+                            <div class="stepper-service-cluster" *ngFor="let s of sopData.services; let i = index; let isLastSvc = last"
+                                 [class.is-completed]="s.service_status === 'completed'"
+                                 [class.is-in-progress]="s.service_status === 'in_progress'"
+                                 [class.is-pending]="s.service_status === 'pending'"
+                                 [class.is-selected]="selectedSopService?.id === s.id">
+
+                                <!-- 1. MAJOR SERVICE NODE (Large Dot on continuous vertical spine) -->
+                                <div class="timeline-row major-service-row"
+                                     [draggable]="!isOrderClosed"
+                                     (dragstart)="!isOrderClosed && onServiceDragStart(i, $event)"
+                                     (dragover)="!isOrderClosed && onServiceDragOver($event)"
+                                     (drop)="!isOrderClosed && onServiceDrop(i, $event)">
+
+                                    <!-- Drag Handle -->
+                                    <div class="spine-drag-col" *ngIf="!isOrderClosed" title="Drag to reorder service sequence">
+                                        <div class="drag-dots">
+                                            <span></span><span></span>
+                                            <span></span><span></span>
+                                            <span></span><span></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Spine Track Column with Vertical Line and Large Dot -->
+                                    <div class="spine-track-col major-track-col">
+                                        <!-- Vertical Line Segment -->
+                                        <div class="spine-line-segment" 
+                                             [class.is-first]="i === 0"
+                                             [class.is-last]="isLastSvc && (!s.subtasks || s.subtasks.length === 0)"
+                                             [ngClass]="s.service_status"></div>
+
+                                        <!-- Large Circle Dot (Flipkart Style) -->
+                                        <div class="spine-large-dot" 
+                                             [ngClass]="s.service_status"
+                                             [title]="'Service ' + (s.sequence_order || (i+1)) + ': ' + getStatusText(s.service_status)">
+                                            <ion-icon *ngIf="s.service_status === 'completed'" name="checkmark"></ion-icon>
+                                            <span *ngIf="s.service_status === 'in_progress'" class="inner-pulse-dot"></span>
+                                            <span *ngIf="s.service_status === 'pending'" class="inner-pending-empty"></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Major Service Content Card -->
+                                    <div class="spine-node-card major-service-card" (click)="selectSopService(s)">
+                                        <div class="service-card-main-bar">
+                                            <!-- Title & Badge Group -->
+                                            <div class="service-heading-wrap">
+                                                <span class="service-seq-badge">{{ s.sequence_order || (i + 1) }}.</span>
+                                                <h3 class="service-title-text">{{ s.service_name || s.subcategory_name }}</h3>
+                                                <span class="service-status-chip" [ngClass]="s.service_status">
+                                                    <span class="chip-dot"></span>
+                                                    {{ getStatusText(s.service_status) }}
+                                                </span>
+                                            </div>
+
+                                            <!-- Controls & Dates Group -->
+                                            <div class="service-actions-wrap">
+                                                <!-- Start Date Pill (Editable in-place) -->
+                                                <div class="date-chip-pill" [class.editable-chip]="!isOrderClosed" (click)="openDatePicker($event)" title="Service Start Date - Click to edit">
+                                                    <span class="date-lbl">Start</span>
+                                                    <ion-icon name="calendar-outline"></ion-icon>
+                                                    <span class="date-val">{{ formatDateDisplay(s.start_date) }}</span>
+                                                    <input *ngIf="!isOrderClosed" type="date" class="date-overlay-input" 
+                                                           [ngModel]="formatDateForInput(s.start_date)" 
+                                                           (click)="openDatePicker($event)" 
+                                                           (change)="onServiceDateChange(s, 'start_date', $event)" />
+                                                </div>
+
+                                                <!-- End Date Pill (Editable in-place) -->
+                                                <div class="date-chip-pill" [class.editable-chip]="!isOrderClosed" (click)="openDatePicker($event)" title="Service End Date - Click to edit">
+                                                    <span class="date-lbl">End</span>
+                                                    <ion-icon name="calendar-outline"></ion-icon>
+                                                    <span class="date-val">{{ formatDateDisplay(s.end_date) }}</span>
+                                                    <input *ngIf="!isOrderClosed" type="date" class="date-overlay-input" 
+                                                           [ngModel]="formatDateForInput(s.end_date)" 
+                                                           (click)="openDatePicker($event)" 
+                                                           (change)="onServiceDateChange(s, 'end_date', $event)" />
+                                                </div>
+
+                                                <!-- + Sub Task Button -->
+                                                <button *ngIf="!isOrderClosed" type="button" class="btn-spine-add-subtask" (click)="openAddSubtask(s, $event)" title="Add subtask to this service">
+                                                    <ion-icon name="add-circle-outline"></ion-icon>
+                                                    <span>Sub Task</span>
+                                                </button>
+
+                                                <!-- Chevron Details Button -->
+                                                <button type="button" class="btn-spine-chevron" (click)="selectSopService(s); $event.stopPropagation()" aria-label="Select service">
+                                                    <ion-icon [name]="selectedSopService?.id === s.id ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Service Description Row if present -->
+                                        <div class="service-desc-row" *ngIf="s.description">
+                                            <p class="service-desc-text">{{ s.description }}</p>
+                                        </div>
+
+                                        <!-- Progress Bar (Compact 4px) -->
+                                        <div class="service-progress-track">
+                                            <div class="service-progress-fill"
+                                                 [style.width.%]="s.service_status === 'completed' ? 100 : (s.calculated_progress !== undefined ? s.calculated_progress : s.progress_percent)"
+                                                 [style.backgroundColor]="getProgressColor(s.service_status, s.calculated_progress !== undefined ? s.calculated_progress : s.progress_percent)">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 2. SUBTASKS ALONG THE EXACT SAME VERTICAL LINE (Small Dots) -->
+                                <div class="subtasks-vertical-spine-cluster" *ngIf="s.subtasks && s.subtasks.length > 0">
+                                    <div class="timeline-row subtask-stepper-row" *ngFor="let st of s.subtasks; let j = index; let isLastSt = last"
+                                         [class.st-is-completed]="st.status === 'completed'"
+                                         [class.st-is-in-progress]="st.status === 'in_progress'"
+                                         [class.st-is-pending]="st.status === 'pending'"
+                                         [draggable]="!isOrderClosed"
+                                         (dragstart)="!isOrderClosed && onSubtaskDragStart(s.id, j, $event)"
+                                         (dragover)="!isOrderClosed && onSubtaskDragOver($event)"
+                                         (drop)="!isOrderClosed && onSubtaskDrop(s, j, $event)">
+
+                                        <!-- Subtask Drag Grip -->
+                                        <div class="spine-drag-col subtask-drag-col" *ngIf="!isOrderClosed" title="Drag to change subtask sequence">
+                                            <ion-icon name="reorder-two-outline"></ion-icon>
+                                        </div>
+
+                                        <!-- Small Dot on the EXACT SAME Spine Column -->
+                                        <div class="spine-track-col small-track-col">
+                                            <!-- Vertical Track Line Segment -->
+                                            <div class="spine-line-segment subtask-line-segment" 
+                                                 [class.is-last]="isLastSvc && isLastSt" 
+                                                 [ngClass]="st.status"></div>
+
+                                            <!-- Small Dot (14px) centered on same vertical axis -->
+                                            <div class="spine-small-dot" 
+                                                 [ngClass]="st.status"
+                                                 [title]="'Subtask ' + (j+1) + ': ' + getStatusText(st.status)">
+                                                <ion-icon *ngIf="st.status === 'completed'" name="checkmark"></ion-icon>
+                                                <span *ngIf="st.status === 'in_progress'" class="inner-small-orange"></span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Subtask Content Card -->
+                                        <div class="spine-node-card subtask-node-card" (click)="openSubtaskDetails(st, s, $event)">
+                                            <div class="st-card-info-wrap">
+                                                <span class="st-seq-num">{{ s.sequence_order || (i + 1) }}.{{ j + 1 }}</span>
+                                                <strong class="st-title-text" [title]="st.title">{{ st.title }}</strong>
+                                                
+                                                <span class="subtask-status-chip" [ngClass]="st.status">
+                                                    {{ getStatusText(st.status) }}
+                                                </span>
+                                            </div>
+
+                                            <div class="st-card-controls-wrap">
+                                                <!-- Editable Subtask Date Range: Both Start and End are individually editable -->
+                                                <div class="st-dates-range-group" (click)="$event.stopPropagation()">
+                                                    <!-- Subtask Start Date -->
+                                                    <div class="st-mini-date-chip" [class.editable-chip]="!isOrderClosed" (click)="openDatePicker($event)" title="Click to edit subtask start date">
+                                                        <span class="st-date-lbl">Start</span>
+                                                        <ion-icon name="calendar-outline"></ion-icon>
+                                                        <span class="st-date-txt">{{ st.start_date ? (st.start_date | date:'dd MMM') : 'Set start' }}</span>
+                                                        <input *ngIf="!isOrderClosed" type="date" class="date-overlay-input" 
+                                                               [ngModel]="formatDateForInput(st.start_date)" 
+                                                               (click)="openDatePicker($event)"
+                                                               (change)="onSubtaskDateChange(s, st, 'start_date', $event)" />
+                                                    </div>
+
+                                                    <span class="st-date-sep">–</span>
+
+                                                    <!-- Subtask End Date -->
+                                                    <div class="st-mini-date-chip" [class.editable-chip]="!isOrderClosed" (click)="openDatePicker($event)" title="Click to edit subtask end date">
+                                                        <span class="st-date-lbl">End</span>
+                                                        <ion-icon name="calendar-outline"></ion-icon>
+                                                        <span class="st-date-txt">{{ st.end_date ? (st.end_date | date:'dd MMM') : 'Set end' }}</span>
+                                                        <input *ngIf="!isOrderClosed" type="date" class="date-overlay-input" 
+                                                               [ngModel]="formatDateForInput(st.end_date)" 
+                                                               (click)="openDatePicker($event)"
+                                                               (change)="onSubtaskDateChange(s, st, 'end_date', $event)" />
+                                                    </div>
+                                                </div>
+
+                                                <!-- View Proof / Details Button -->
+                                                <button type="button" class="btn-st-action-view" (click)="openSubtaskDetails(st, s, $event)" title="View subtask details & completion proof">
+                                                    <ion-icon name="eye-outline"></ion-icon>
+                                                    <span>View</span>
+                                                </button>
+
+                                                <!-- Vendor Mark Done Button (if active) -->
+                                                <button *ngIf="!isOrderClosed && st.status !== 'completed'" type="button" class="btn-st-mark-done" (click)="markSubtaskDone(st, s, $event)" title="Mark this subtask as completed">
+                                                    <ion-icon name="checkmark"></ion-icon>
+                                                    <span>Done</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 3. Inline Add Subtask Prompt on Same Spine (If no subtasks yet) -->
+                                <div class="timeline-row add-subtask-row" *ngIf="!isOrderClosed && (!s.subtasks || s.subtasks.length === 0)">
+                                    <div class="spine-drag-col"></div>
+                                    <div class="spine-track-col small-track-col">
+                                        <div class="spine-line-segment dashed-segment"></div>
+                                        <div class="spine-empty-dot"></div>
+                                    </div>
+                                    <div class="spine-empty-action">
+                                        <button type="button" class="btn-add-first-subtask" (click)="openAddSubtask(s, $event)" title="Add subtask to this service">
+                                            <ion-icon name="add-circle-outline"></ion-icon>
+                                            <span>+ Add subtasks for {{ s.service_name || s.subcategory_name }}</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Instructional Tip (hidden if closed) -->
+                        <div class="sequence-footer-tip" *ngIf="!isOrderClosed">
+                            <ion-icon name="information-circle-outline"></ion-icon>
+                            <span>Drag and drop services or subtasks to reorder sequence freely. Services can run simultaneously.</span>
+                        </div>
+                    </section>
+
+                    <!-- RIGHT COLUMN: SERVICE DETAILS PANEL -->
+                    <aside class="service-details-col" *ngIf="selectedSopService">
+                        <div class="details-card-container">
+                            <!-- Header with Close Button -->
+                            <div class="details-header-bar">
+                                <div class="details-title-row">
+                                    <span class="service-status-dot" [ngClass]="selectedSopService.service_status"></span>
+                                    <h3 class="details-service-title">
+                                        {{ selectedSopService.sequence_order || 1 }}. {{ selectedSopService.service_name || selectedSopService.subcategory_name }}
+                                    </h3>
+                                </div>
+                                <button type="button" class="btn-close-details" (click)="selectedSopService = null" aria-label="Close details" title="Collapse Panel">
+                                    <ion-icon name="close"></ion-icon>
+                                </button>
+                            </div>
+
+                            <!-- Status Badge Pill -->
+                            <div class="details-status-badge-wrap">
+                                <span class="status-pill-badge" [ngClass]="selectedSopService.service_status">
+                                    <span class="badge-dot"></span>
+                                    {{ getStatusText(selectedSopService.service_status) }}
+                                </span>
+                            </div>
+
+                            <!-- Date Range Form Controls -->
+                            <div class="details-dates-grid">
+                                <div class="details-date-box editable-date-box" (click)="openDatePicker($event)" title="Click to edit Start Date">
+                                    <label class="details-date-label">Start Date</label>
+                                    <div class="details-input-field">
+                                        <ion-icon name="calendar-outline"></ion-icon>
+                                        <span>{{ formatDateDisplay(selectedSopService.start_date) }}</span>
+                                        <ion-icon name="calendar-number-outline" class="end-cal-icon"></ion-icon>
+                                        <input type="date" class="date-overlay-input" 
+                                               [ngModel]="formatDateForInput(selectedSopService.start_date)" 
+                                               (click)="openDatePicker($event)"
+                                               (change)="onServiceDateChange(selectedSopService, 'start_date', $event)" 
+                                               [disabled]="isOrderClosed" />
+                                    </div>
+                                </div>
+
+                                <div class="details-date-box editable-date-box" (click)="openDatePicker($event)" title="Click to edit End Date">
+                                    <label class="details-date-label">End Date</label>
+                                    <div class="details-input-field">
+                                        <ion-icon name="calendar-outline"></ion-icon>
+                                        <span>{{ formatDateDisplay(selectedSopService.end_date) }}</span>
+                                        <ion-icon name="calendar-number-outline" class="end-cal-icon"></ion-icon>
+                                        <input type="date" class="date-overlay-input" 
+                                               [ngModel]="formatDateForInput(selectedSopService.end_date)" 
+                                               (click)="openDatePicker($event)"
+                                               (change)="onServiceDateChange(selectedSopService, 'end_date', $event)" 
+                                               [disabled]="isOrderClosed" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Description Box -->
+                            <div class="details-desc-box">
+                                <label class="details-desc-label">Description</label>
+                                <p class="details-desc-content">
+                                    {{ selectedSopService.description || ('Standard phase for ' + (selectedSopService.service_name || selectedSopService.subcategory_name) + ' on project') }}
+                                </p>
+                            </div>
+
+                            <!-- Sub Tasks Section -->
+                            <div class="details-subtasks-section">
+                                <div class="subtasks-header-row">
+                                    <h4 class="details-subtasks-heading">Sub Tasks</h4>
+                                    <span class="subtasks-count-badge">{{ selectedSopService.subtasks?.length || 0 }} tasks</span>
+                                </div>
+
+                                <div class="details-subtasks-list">
+                                    <div class="subtask-card-item" *ngFor="let st of selectedSopService.subtasks">
+                                        <div class="st-card-top-row">
+                                             <div class="st-card-title-row">
+                                                 <span class="st-status-circle-dot" [ngClass]="getSubtaskDotClass(st.status)"></span>
+                                                 <strong class="st-card-title" [title]="st.title">{{ st.title }}</strong>
+                                             </div>
+                                             <span class="st-card-status-badge" [ngClass]="getSubtaskBadgeClass(st.status)">
+                                                 {{ getStatusText(st.status) }}
+                                             </span>
+                                        </div>
+
+                                        <div class="st-card-bottom-row">
+                                            <div class="st-card-dates-range-wrap" (click)="$event.stopPropagation()">
+                                                <div class="st-mini-date-chip" [class.editable-chip]="!isOrderClosed" (click)="openDatePicker($event)" title="Click to edit subtask start date">
+                                                    <ion-icon name="calendar-outline"></ion-icon>
+                                                    <span>{{ st.start_date ? (st.start_date | date:'dd MMM') : 'Start' }}</span>
+                                                    <input *ngIf="!isOrderClosed" type="date" class="date-overlay-input" 
+                                                           [ngModel]="formatDateForInput(st.start_date)" 
+                                                           (click)="openDatePicker($event)" 
+                                                           (change)="onSubtaskDateChange(selectedSopService, st, 'start_date', $event)" />
+                                                </div>
+                                                <span class="st-date-sep">–</span>
+                                                <div class="st-mini-date-chip" [class.editable-chip]="!isOrderClosed" (click)="openDatePicker($event)" title="Click to edit subtask end date">
+                                                    <span>{{ st.end_date ? (st.end_date | date:'dd MMM') : 'End' }}</span>
+                                                    <input *ngIf="!isOrderClosed" type="date" class="date-overlay-input" 
+                                                           [ngModel]="formatDateForInput(st.end_date)" 
+                                                           (click)="openDatePicker($event)" 
+                                                           (change)="onSubtaskDateChange(selectedSopService, st, 'end_date', $event)" />
+                                                </div>
+                                            </div>
+                                            <div class="st-card-actions-group">
+                                                <button type="button" class="btn-st-view-action" (click)="openSubtaskDetails(st, selectedSopService, $event)">
+                                                    View
+                                                </button>
+                                                <button *ngIf="st.status !== 'completed' && !isOrderClosed" type="button" class="btn-st-mark-done" (click)="completeSubtask(st)">
+                                                    Mark Done
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="st-empty-list" *ngIf="!selectedSopService.subtasks || selectedSopService.subtasks.length === 0">
+                                        <p>No sub tasks created for this service yet.</p>
+                                    </div>
+                                </div>
+
+                                <!-- + Add Sub Task Outline Button -->
+                                <button type="button" class="btn-add-subtask-full" (click)="openAddSubtask(selectedSopService)">
+                                    <ion-icon name="add"></ion-icon>
+                                    <span>Add Sub Task</span>
+                                </button>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT PANE EMPTY STATE (If no conversation selected) -->
+        <div class="chat-right-pane empty-right-pane" *ngIf="!activeConversation">
+            <div class="no-selection-content">
+                <div class="large-icon-circle">
+                    <ion-icon name="chatbubbles"></ion-icon>
+                </div>
+                <h3>Vendor Project Communications</h3>
+                <p>Select an ongoing service project from the left panel to coordinate with clients and manage service delivery.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Lightbox Modal -->
+<div class="lightbox-modal" *ngIf="previewImageUrl" (click)="closeImagePreview()">
+    <div class="lightbox-content" (click)="$event.stopPropagation()">
+        <img [src]="previewImageUrl" alt="Full Preview" />
+        <div class="lightbox-toolbar">
+            <a [href]="previewImageUrl" target="_blank" download class="lightbox-action-btn" title="Download Image">
+                <ion-icon name="download-outline"></ion-icon>
+                <span>Download</span>
+            </a>
+            <button type="button" class="lightbox-close" (click)="closeImagePreview()" title="Close">
+                <ion-icon name="close"></ion-icon>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: ADD SUB TASK -->
+<div class="sop-modal-backdrop" *ngIf="showAddSubtaskModal" (click)="closeAddSubtaskModal()">
+    <div class="sop-modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-card-header">
+            <h3 class="modal-card-title">Add Sub Task</h3>
+            <button type="button" class="modal-close-btn" (click)="closeAddSubtaskModal()">
+                <ion-icon name="close"></ion-icon>
+            </button>
+        </div>
+        <div class="modal-card-body">
+            <div class="modal-form-grid">
+                <div class="form-field-group">
+                    <label class="form-label">Title *</label>
+                    <input type="text" [(ngModel)]="newSubtask.title" placeholder="Enter sub task title" class="form-text-input" />
+                </div>
+                <div class="form-field-group">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" [(ngModel)]="newSubtask.start_date" class="form-text-input" />
+                </div>
+                <div class="form-field-group full-width-field">
+                    <label class="form-label">Description</label>
+                    <textarea [(ngModel)]="newSubtask.description" rows="3" placeholder="Enter description" class="form-textarea-input"></textarea>
+                </div>
+                <div class="form-field-group">
+                    <label class="form-label">End Date</label>
+                    <input type="date" [(ngModel)]="newSubtask.end_date" class="form-text-input" />
+                </div>
+                <div class="form-field-group">
+                    <label class="form-label">Notify Next Service (Vendor)</label>
+                    <select [(ngModel)]="newSubtask.next_order_service_id" class="form-text-input" style="height: 42px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; padding: 0 10px; font-size: 13px; color: #111827; width: 100%;">
+                        <option [ngValue]="null">-- Select Next Vendor/Service --</option>
+                        <option *ngFor="let svc of getAvailableNextServices()" [value]="svc.id">
+                            {{ svc.service_name || svc.subcategory_name }} ({{ svc.vendor_name || 'Vendor #' + svc.vendor_id }})
+                        </option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="modal-card-footer">
+            <button type="button" class="btn-footer-cancel" (click)="closeAddSubtaskModal()">Cancel</button>
+            <button type="button" class="btn-footer-save" [disabled]="!newSubtask.title.trim() || isSavingSubtask" (click)="saveSubtask()">
+                <ion-spinner *ngIf="isSavingSubtask" name="crescent"></ion-spinner>
+                <span *ngIf="!isSavingSubtask">Save Subtask</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: VIEW SUBTASK DETAILS & PROOF UPLOAD -->
+<div class="sop-modal-backdrop" *ngIf="showSubtaskDetailsModal && selectedSubtask" (click)="closeSubtaskDetailsModal()">
+    <div class="sop-modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-card-header">
+            <h3 class="modal-card-title">{{ selectedSubtask.title }}</h3>
+            <button type="button" class="modal-close-btn" (click)="closeSubtaskDetailsModal()">
+                <ion-icon name="close"></ion-icon>
+            </button>
+        </div>
+        <div class="modal-card-body">
+            <div class="subtask-detail-info">
+                <p class="st-desc" *ngIf="selectedSubtask.description">{{ selectedSubtask.description }}</p>
+                <div class="st-meta-row">
+                    <span><strong>Status:</strong> {{ getStatusText(selectedSubtask.status) }}</span>
+                    <span *ngIf="selectedSubtask.start_date"><strong>Timeline:</strong> {{ selectedSubtask.start_date | date:'dd MMM yyyy' }} {{ selectedSubtask.end_date ? ('- ' + (selectedSubtask.end_date | date:'dd MMM yyyy')) : '' }}</span>
+                </div>
+
+                <!-- Proof image display -->
+                <div class="st-proof-area" *ngIf="hasSubtaskProof()">
+                    <label class="form-label">Completion Proof Image:</label>
+                    <div class="proof-img-box" (click)="openImagePreview(getActiveSubtaskProofUrl())" title="Click to enlarge in full view">
+                        <img [src]="getMediaUrl(getActiveSubtaskProofUrl())" alt="Proof image" />
+                        <span class="click-hint">Click to enlarge</span>
+                    </div>
+
+                    <!-- Additional proof thumbnails if multiple -->
+                    <div class="proof-gallery-grid" *ngIf="getSubtaskProofImages().length > 1">
+                        <div class="proof-thumb-card" 
+                            *ngFor="let p of getSubtaskProofImages()"
+                            [class.active-thumb]="getActiveSubtaskProofUrl() === p.image_url"
+                            (click)="selectSubtaskProofImage(p.image_url, $event)"
+                            title="Click to view in card above">
+                            <img [src]="getMediaUrl(p.image_url)" [alt]="p.original_name || 'Proof'" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vendor Upload Proof File input (Available only before changing subtask to done) -->
+                <div class="st-upload-box" *ngIf="!isOrderClosed && selectedSubtask.status !== 'completed'">
+                    <label class="form-label">{{ hasSubtaskProof() ? 'Upload Additional Proof Photo:' : 'Upload Completion Proof Photo:' }}</label>
+                    <div class="upload-btn-wrap">
+                        <input type="file" accept="image/*" (change)="onProofFileSelected($event, selectedSubtask)" [disabled]="isUploadingProof" />
+                        <ion-spinner *ngIf="isUploadingProof" name="crescent"></ion-spinner>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-card-footer">
+            <button type="button" class="btn-footer-cancel" (click)="closeSubtaskDetailsModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: COMPLETE SUBTASK WITH INPUTS OF VIEW CARD & MANDATORY IMAGE PROOF -->
+<div class="sop-modal-backdrop" *ngIf="showCompleteSubtaskModal && subtaskToComplete" (click)="closeCompleteSubtaskModal()">
+    <div class="sop-modal-card complete-subtask-modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-card-header complete-modal-header">
+            <div class="modal-title-with-badge">
+                <span class="st-status-circle-dot" [ngClass]="getSubtaskDotClass(subtaskToComplete.status)"></span>
+                <h3 class="modal-card-title">{{ subtaskToComplete.title }}</h3>
+                <span class="subtask-status-chip" [ngClass]="subtaskToComplete.status">
+                    {{ getStatusText(subtaskToComplete.status) }}
+                </span>
+            </div>
+            <button type="button" class="modal-close-btn" (click)="closeCompleteSubtaskModal()" [disabled]="isCompletingSubtask" title="Close">
+                <ion-icon name="close"></ion-icon>
+            </button>
+        </div>
+
+        <div class="modal-card-body">
+            <div class="subtask-detail-info">
+                <!-- Subtask Timeline from View Card if available -->
+                <div class="st-meta-row" *ngIf="subtaskToComplete.start_date || subtaskToComplete.end_date">
+                    <span><strong>Timeline:</strong> {{ subtaskToComplete.start_date ? (subtaskToComplete.start_date | date:'dd MMM yyyy') : 'Start not set' }} {{ subtaskToComplete.end_date ? ('- ' + (subtaskToComplete.end_date | date:'dd MMM yyyy')) : '' }}</span>
+                    <span><strong>Status:</strong> {{ getStatusText(subtaskToComplete.status) }}</span>
+                </div>
+
+                <!-- Description Input from View Card (Not mandatory to fill, but present) -->
+                <div class="form-field-group full-width-field">
+                    <div class="field-label-row">
+                        <label class="form-label">Description / Remarks</label>
+                        <span class="optional-tag-badge">Optional</span>
+                    </div>
+                    <textarea [(ngModel)]="completionDescription" rows="3" placeholder="Enter subtask remarks or work notes (optional)..." class="form-textarea-input"></textarea>
+                </div>
+
+                <!-- Mandatory Choose or Click Image Section -->
+                <div class="st-proof-section-box">
+                    <div class="proof-sec-header">
+                        <label class="form-label mandatory-label">
+                            <ion-icon name="camera-outline"></ion-icon>
+                            <span>Completion Proof Image *</span>
+                        </label>
+                        <span class="mandatory-badge">Required to mark Done</span>
+                    </div>
+
+                    <!-- Hidden file and camera inputs -->
+                    <input type="file" #doneFileInput accept="image/*" (change)="onCompletionImageSelected($event)" style="display:none;" />
+                    <input type="file" #doneCameraInput accept="image/*" capture="environment" (change)="onCompletionImageSelected($event)" style="display:none;" />
+
+                    <!-- If NO image chosen yet: Buttons to Choose or Click Image -->
+                    <div class="image-picker-buttons-grid" *ngIf="!completionImagePreview">
+                        <button type="button" class="btn-image-action btn-choose-image" (click)="doneFileInput.click()">
+                            <div class="action-icon-circle">
+                                <ion-icon name="images-outline"></ion-icon>
+                            </div>
+                            <div class="action-text-wrap">
+                                <strong>Choose Image</strong>
+                                <span>Browse from files/gallery</span>
+                            </div>
+                        </button>
+
+                        <button type="button" class="btn-image-action btn-click-camera" (click)="doneCameraInput.click()">
+                            <div class="action-icon-circle camera-circle">
+                                <ion-icon name="camera-outline"></ion-icon>
+                            </div>
+                            <div class="action-text-wrap">
+                                <strong>Click / Take Photo</strong>
+                                <span>Capture using camera</span>
+                            </div>
+                        </button>
+                    </div>
+
+                    <!-- Selected Image Preview Card -->
+                    <div class="selected-proof-preview-wrap" *ngIf="completionImagePreview">
+                        <div class="proof-img-box preview-box">
+                            <img [src]="completionImagePreview" alt="Proof preview" />
+                            <div class="proof-preview-bar">
+                                <span class="file-name-text" [title]="completionImageFile?.name">{{ completionImageFile?.name }}</span>
+                                <button type="button" class="btn-remove-proof-photo" (click)="removeCompletionImage()" [disabled]="isCompletingSubtask" title="Remove photo">
+                                    <ion-icon name="trash-outline"></ion-icon>
+                                    <span>Remove</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="change-photo-row">
+                            <button type="button" class="btn-change-photo-link" (click)="doneFileInput.click()" [disabled]="isCompletingSubtask">
+                                <ion-icon name="refresh-outline"></ion-icon>
+                                <span>Choose another image</span>
+                            </button>
+                            <span class="change-photo-sep">or</span>
+                            <button type="button" class="btn-change-photo-link" (click)="doneCameraInput.click()" [disabled]="isCompletingSubtask">
+                                <ion-icon name="camera-outline"></ion-icon>
+                                <span>Retake photo</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-card-footer">
+            <button type="button" class="btn-footer-cancel" (click)="closeCompleteSubtaskModal()" [disabled]="isCompletingSubtask">
+                Cancel
+            </button>
+            <button type="button" class="btn-footer-save btn-complete-submit" 
+                    [disabled]="!completionImageFile || isCompletingSubtask" 
+                    (click)="submitCompleteSubtask()"
+                    [title]="!completionImageFile ? 'Please choose or click an image before marking Done' : 'Complete this subtask'">
+                <ion-spinner *ngIf="isCompletingSubtask" name="crescent"></ion-spinner>
+                <ion-icon *ngIf="!isCompletingSubtask" name="checkmark-done-outline"></ion-icon>
+                <span *ngIf="!isCompletingSubtask">Submit & Mark Done</span>
+                <span *ngIf="isCompletingSubtask">Submitting...</span>
+            </button>
+        </div>
+    </div>
+</div>

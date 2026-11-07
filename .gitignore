@@ -1,0 +1,30 @@
+# Dependency directories
+/node_modules
+
+# Build output
+/dist
+/.angular
+
+# Package archives & temporary files
+vendor-qa.zip
+*.zip
+*.tar
+*.gz
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS generated files
+.DS_Store
+Thumbs.db

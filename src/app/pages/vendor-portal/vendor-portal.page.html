@@ -1,0 +1,838 @@
+<ion-header class="ion-no-border vendor-header">
+    <div class="header-inner">
+        <div class="brand-wrap" routerLink="/tabs/home">
+            <div class="brand-icon">
+                <ion-icon name="construct"></ion-icon>
+            </div>
+            <div>
+                <h1 class="brand-title">Vendor Portal</h1>
+                <span class="brand-subtitle">CivilWorks Multi-Trade Partner Network</span>
+            </div>
+        </div>
+
+        <div class="header-user-actions" *ngIf="isLoggedIn">
+            <div class="vendor-avatar-pill">
+                <img *ngIf="currentVendor?.image" [src]="formatImageUrl(currentVendor.image)" [alt]="currentVendor.name" />
+                <span *ngIf="!currentVendor?.image" class="avatar-initial">{{ (currentVendor?.name || 'V').charAt(0).toUpperCase() }}</span>
+                <span class="vendor-name-txt">{{ currentVendor?.name }}</span>
+                <span class="verified-badge">✔ Verified</span>
+            </div>
+            <button type="button" class="btn-logout" (click)="logout()" title="Sign out of Vendor Portal">
+                <ion-icon name="log-out-outline"></ion-icon>
+                <span>Logout</span>
+            </button>
+        </div>
+    </div>
+</ion-header>
+
+<ion-content class="vendor-content">
+    <!-- ========================================== -->
+    <!-- STATE 1: AUTHENTICATION / ENLISTMENT VIEWS -->
+    <!-- ========================================== -->
+    <div class="vendor-auth-wrapper" *ngIf="!isLoggedIn">
+        
+        <!-- Prominent Auth Mode Toggle: Login vs Sign Up / Enlist -->
+        <div class="auth-toggle-pill-wrap">
+            <button type="button" class="auth-tab-btn" [class.active]="authStep === 'mobile' || authStep === 'otp'" (click)="switchToLogin()">
+                <ion-icon name="log-in-outline"></ion-icon>
+                <span>Partner Login</span>
+            </button>
+            <button type="button" class="auth-tab-btn" [class.active]="authStep === 'signup'" (click)="switchToSignup()">
+                <ion-icon name="person-add-outline"></ion-icon>
+                <span>Sign Up / Enlist</span>
+            </button>
+        </div>
+
+        <!-- STEP A: Mobile Check (Login Flow) -->
+        <div class="auth-card" *ngIf="authStep === 'mobile'">
+            <div class="auth-badge-circle">
+                <ion-icon name="shield-checkmark"></ion-icon>
+            </div>
+            <h2 class="auth-title">Vendor Partner Access</h2>
+            <p class="auth-sub">Enter your mobile number to access your assigned orders or enlist as a new service provider on CivilWorks.</p>
+
+            <div class="form-group">
+                <label class="field-label">Registered Mobile Number *</label>
+                <div class="mobile-input-wrap">
+                    <span class="country-prefix">+91</span>
+                    <input type="tel" [(ngModel)]="vendorMobile" (keyup.enter)="submitMobileCheck()" placeholder="e.g. 9876543210" maxlength="10" />
+                </div>
+            </div>
+
+            <button type="button" class="btn-primary-action" [disabled]="!vendorMobile.trim() || isAuthenticating" (click)="submitMobileCheck()">
+                <ion-spinner *ngIf="isAuthenticating" name="crescent"></ion-spinner>
+                <span *ngIf="!isAuthenticating">Continue with Mobile <ion-icon name="arrow-forward"></ion-icon></span>
+            </button>
+
+            <div class="auth-footer-help">
+                <ion-icon name="information-circle-outline"></ion-icon>
+                <span>Existing partners will receive an OTP login. New partners will proceed to the enlistment registration form.</span>
+            </div>
+
+            <!-- PROMINENT DIRECT SIGN UP / ENLIST BUTTON -->
+            <div class="signup-prompt-banner">
+                <div class="prompt-text-group">
+                    <span class="prompt-title">New to CivilWorks?</span>
+                    <span class="prompt-desc">Enlist your business & services to receive project assignments</span>
+                </div>
+                <button type="button" class="btn-enlist-prompt" (click)="switchToSignup()">
+                    <ion-icon name="person-add"></ion-icon>
+                    <span>Sign Up / Enlist Now</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- STEP B: OTP Verification (Existing Enlisted Vendor) -->
+        <div class="auth-card" *ngIf="authStep === 'otp'">
+            <div class="auth-badge-circle success-circle">
+                <ion-icon name="key-outline"></ion-icon>
+            </div>
+            <h2 class="auth-title">Verify Mobile Number</h2>
+            <p class="auth-sub">Welcome back, <strong>{{ currentVendor?.name }}</strong>! Enter the 4-digit verification code sent to <strong>+91 {{ vendorMobile }}</strong>.</p>
+            <div class="demo-otp-banner">
+                <ion-icon name="phone-portrait-outline"></ion-icon>
+                <span>Test OTP Code: <strong>1234</strong></span>
+            </div>
+
+            <div class="form-group">
+                <label class="field-label">4-Digit Verification Code</label>
+                <input type="text" class="otp-input-field" [(ngModel)]="otpCode" (keyup.enter)="submitOtpLogin()" maxlength="4" placeholder="• • • •" />
+            </div>
+
+            <button type="button" class="btn-primary-action" [disabled]="!otpCode.trim() || isAuthenticating" (click)="submitOtpLogin()">
+                <ion-spinner *ngIf="isAuthenticating" name="crescent"></ion-spinner>
+                <span *ngIf="!isAuthenticating">Verify & Access Dashboard <ion-icon name="checkmark-circle"></ion-icon></span>
+            </button>
+
+            <div class="auth-alt-row">
+                <button type="button" class="btn-text-link" (click)="resetAuth()">
+                    <ion-icon name="arrow-back"></ion-icon>
+                    <span>Change Mobile Number</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- STEP C: Sign Up / Add Vendor Form (Mirrors Admin Add Vendor modal) -->
+        <div class="auth-card signup-card-wide" *ngIf="authStep === 'signup'">
+            <div class="signup-header">
+                <h2 class="modal-main-title">Add Vendor</h2>
+                <p class="modal-sub-title">CONFIGURE VENDOR INFORMATION & SERVICES PROVIDED</p>
+                <div class="signup-top-switch">
+                    <span>Already an enlisted partner?</span>
+                    <button type="button" class="btn-switch-link" (click)="switchToLogin()">
+                        <ion-icon name="log-in-outline"></ion-icon>
+                        <span>Log In with Mobile OTP</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="signup-body">
+                <!-- VENDOR PHOTO / LOGO -->
+                <div class="photo-upload-section">
+                    <div class="photo-box">
+                        <img *ngIf="signupData.image" [src]="formatImageUrl(signupData.image)" alt="Vendor Preview" />
+                        <div *ngIf="!signupData.image" class="photo-placeholder">
+                            <ion-icon name="image-outline"></ion-icon>
+                            <span>PHOTO</span>
+                        </div>
+                    </div>
+                    <div class="photo-info-wrap">
+                        <h4 class="photo-title">VENDOR PHOTO / LOGO</h4>
+                        <p class="photo-desc">Upload a profile picture or avatar for this vendor</p>
+                        <label class="btn-upload-label">
+                            <ion-spinner *ngIf="isUploadingPhoto" name="crescent"></ion-spinner>
+                            <ion-icon *ngIf="!isUploadingPhoto" name="cloud-upload-outline"></ion-icon>
+                            <span>{{ isUploadingPhoto ? 'Uploading...' : 'Upload Image' }}</span>
+                            <input type="file" (change)="onFileSelected($event)" accept="image/*" style="display: none;" />
+                        </label>
+                    </div>
+                </div>
+
+                <!-- FORM FIELDS GRID -->
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label class="field-label">VENDOR NAME *</label>
+                        <input type="text" class="text-input-field" [(ngModel)]="signupData.name" placeholder="e.g. Apex Civil Solutions" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="field-label">MOBILE NUMBER *</label>
+                        <input type="tel" class="text-input-field" [(ngModel)]="signupData.mobile" placeholder="+91 9876543210" maxlength="10" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="field-label">EMAIL ADDRESS</label>
+                        <input type="email" class="text-input-field" [(ngModel)]="signupData.email" placeholder="vendor@example.com" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="field-label">STATUS</label>
+                        <div class="status-readonly-box">
+                            <span class="status-dot"></span>
+                            <span class="status-text">Active</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SERVICES PROVIDED MULTI-SELECT CHIPS -->
+                <div class="services-selection-section">
+                    <div class="services-header-row">
+                        <label class="field-label-bold">SERVICES PROVIDED (SERVICE SUB CATEGORIES ONLY)</label>
+                        <span class="selected-counter">{{ selectedSubcategoryIds.length }} SELECTED</span>
+                    </div>
+                    <p class="services-help-text">Click to select/deselect the service subcategories this vendor provides:</p>
+
+                    <div class="subcategories-chips-container">
+                        <div class="subcat-chip" *ngFor="let sub of availableSubcategories"
+                            [class.chip-selected]="isSubcategorySelected(sub.id)"
+                            (click)="toggleSubcategory(sub.id)">
+                            <span class="chip-dot"></span>
+                            <span class="chip-name">{{ sub.name }}</span>
+                            <span class="chip-cat" *ngIf="sub.category_name">({{ sub.category_name }})</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- OTP Verification Field for Signup -->
+                <div class="form-group otp-group-signup">
+                    <label class="field-label">MOBILE VERIFICATION OTP * (Default: 1234)</label>
+                    <input type="text" class="text-input-field otp-signup-input" [(ngModel)]="signupData.otp" placeholder="Enter 1234" maxlength="4" />
+                </div>
+
+                <!-- ACTION BUTTONS -->
+                <div class="signup-actions-row">
+                    <button type="button" class="btn-modal-cancel" (click)="resetAuth()">
+                        CANCEL
+                    </button>
+                    <button type="button" class="btn-modal-submit" [disabled]="!signupData.name || !signupData.mobile || selectedSubcategoryIds.length === 0 || isAuthenticating" (click)="submitSignup()">
+                        <ion-spinner *ngIf="isAuthenticating" name="crescent"></ion-spinner>
+                        <span *ngIf="!isAuthenticating">ADD VENDOR</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- STATE 2: AUTHENTICATED VENDOR DASHBOARD    -->
+    <!-- ========================================== -->
+    <div class="vendor-dashboard-wrapper" *ngIf="isLoggedIn">
+        
+        <!-- Navigation Tab Header -->
+        <div class="portal-nav-bar">
+            <div class="nav-tabs-wrap">
+                <button type="button" class="tab-item-btn" [class.active]="activeTab === 'orders'" (click)="openOrdersTab()">
+                    <ion-icon name="cube-outline"></ion-icon>
+                    <span>My Orders</span>
+                    <span class="badge-count alert-badge" *ngIf="newOrdersCount > 0">{{ newOrdersCount }}</span>
+                </button>
+
+                <button type="button" class="tab-item-btn" [class.active]="activeTab === 'notifications'" (click)="openNotificationsTab()">
+                    <ion-icon name="notifications-outline"></ion-icon>
+                    <span>Notifications</span>
+                    <span class="badge-count alert-badge" *ngIf="unreadNotificationsCount > 0">{{ unreadNotificationsCount }}</span>
+                </button>
+
+                <button type="button" class="tab-item-btn" [class.active]="activeTab === 'chat'" (click)="openChatsTab()">
+                    <ion-icon name="chatbubbles-outline"></ion-icon>
+                    <span>Project Chats</span>
+                    <span class="badge-count alert-badge" *ngIf="unreadChatsCount > 0">{{ unreadChatsCount }}</span>
+                </button>
+
+                <button type="button" class="tab-item-btn" [class.active]="activeTab === 'profile'" (click)="activeTab = 'profile'">
+                    <ion-icon name="person-circle-outline"></ion-icon>
+                    <span>My Profile</span>
+                </button>
+            </div>
+
+            <div class="nav-extra-actions">
+                <button type="button" class="btn-refresh-data" (click)="loadDashboardData()" title="Refresh assigned data">
+                    <ion-icon name="refresh-outline"></ion-icon>
+                    <span>Refresh</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- TAB 1: MY ORDERS & ASSIGNED REQUESTS -->
+        <div class="dashboard-tab-content" *ngIf="activeTab === 'orders'">
+            <!-- Status Filter Bar -->
+            <div class="filters-bar">
+                <button class="filter-pill" [class.active]="orderFilter === 'all'" (click)="orderFilter = 'all'">
+                    All Orders ({{ orders.length }})
+                </button>
+                <button class="filter-pill" [class.active]="orderFilter === 'pending'" (click)="orderFilter = 'pending'">
+                    Pending Requests ({{ pendingOrdersCount }})
+                </button>
+                <button class="filter-pill" [class.active]="orderFilter === 'in_progress'" (click)="orderFilter = 'in_progress'">
+                    In Progress / Accepted
+                </button>
+                <button class="filter-pill" [class.active]="orderFilter === 'completed'" (click)="orderFilter = 'completed'">
+                    Completed / Removed
+                </button>
+            </div>
+
+            <!-- Loading State -->
+            <div class="state-loading-box" *ngIf="loadingOrders">
+                <ion-spinner name="crescent"></ion-spinner>
+                <p>Loading your assigned project orders...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div class="state-empty-box" *ngIf="!loadingOrders && filteredOrders.length === 0">
+                <ion-icon name="file-tray-full-outline"></ion-icon>
+                <h3>No Orders Found</h3>
+                <p>No project orders match this filter. When customers book your services, they will appear here immediately.</p>
+            </div>
+
+            <!-- Orders Grid -->
+            <div class="orders-cards-grid" *ngIf="!loadingOrders && filteredOrders.length > 0">
+                <div class="vendor-order-card" *ngFor="let order of filteredOrders" 
+                    [class.card-accepted]="order.vendor_status === 'accepted'"
+                    [class.card-pending]="order.vendor_status === 'pending'"
+                    [class.card-removed]="order.is_removed">
+                    
+                    <!-- Top Ribbon -->
+                    <div class="card-ribbon">
+                        <div class="service-ident">
+                            <span class="sector-dot"></span>
+                            <span class="service-main-title">{{ order.service_name || order.subcategory_name }}</span>
+                            <span class="subcat-pill" *ngIf="order.subcategory_name && order.subcategory_name !== order.service_name">
+                                {{ order.subcategory_name }}
+                            </span>
+                        </div>
+                        <span class="vendor-status-pill" [class]="'status-' + (order.service_status === 'completed' ? 'completed' : (order.vendor_status === 'rejected' ? 'rejected' : (order.is_removed ? 'removed' : (order.vendor_status || 'pending'))))">
+                            {{ order.service_status === 'completed' ? 'COMPLETED' : (order.vendor_status === 'rejected' ? 'DECLINED' : (order.is_removed ? 'REMOVED' : ((order.vendor_status || 'pending') | uppercase))) }}
+                        </span>
+                    </div>
+
+                    <!-- Meta Header -->
+                    <div class="card-meta-row">
+                        <div class="order-id-group">
+                            <span class="meta-label">PROJECT ORDER</span>
+                            <strong class="meta-val">#{{ order.order_no }}</strong>
+                        </div>
+                        <span class="meta-date">Placed {{ order.order_created_at | date:'mediumDate' }}</span>
+                    </div>
+
+                    <!-- Card Details Content -->
+                    <div class="card-body-details">
+                        <!-- Work Site / Delivery Address -->
+                        <div class="detail-block address-block">
+                            <div class="block-icon">
+                                <ion-icon name="location-outline"></ion-icon>
+                            </div>
+                            <div class="block-info">
+                                <span class="block-title">Customer Site Address</span>
+                                <p class="block-text">{{ order.site_address }}</p>
+                                <div class="address-sub-chips" *ngIf="order.address?.landmark || order.address?.address_line_1">
+                                    <span class="addr-chip" *ngIf="order.address?.address_line_1">🏢 {{ order.address.address_line_1 }}</span>
+                                    <span class="addr-chip" *ngIf="order.address?.landmark">📍 {{ order.address.landmark }}</span>
+                                    <span class="addr-chip" *ngIf="order.address?.address_line_2">🗺️ {{ order.address.address_line_2 }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Agreed Rate / Price -->
+                        <div class="detail-block rate-block" *ngIf="order.price">
+                            <div class="block-icon">
+                                <ion-icon name="cash-outline"></ion-icon>
+                            </div>
+                            <div class="block-info">
+                                <span class="block-title">Agreed Service Rate</span>
+                                <strong class="rate-highlight">₹{{ order.price | number:'1.2-2' }}</strong>
+                            </div>
+                        </div>
+
+                        <!-- Site Instructions / Requirements -->
+                        <div class="detail-block notes-block" *ngIf="order.notes">
+                            <div class="block-icon">
+                                <ion-icon name="document-text-outline"></ion-icon>
+                            </div>
+                            <div class="block-info">
+                                <span class="block-title">Site Instructions</span>
+                                <p class="block-text">{{ order.notes }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Customer Details (PRIVACY GATED) -->
+                        <div class="detail-block customer-privacy-block" [class.unlocked]="order.customer">
+                            <!-- If Locked (Pending Request) -->
+                            <ng-container *ngIf="!order.customer">
+                                <div class="privacy-locked-content">
+                                    <ion-icon name="lock-closed"></ion-icon>
+                                    <div>
+                                        <strong class="privacy-title">Customer Contact Protected</strong>
+                                        <p class="privacy-desc">Customer identity & direct contact details will unlock immediately once you accept this service request.</p>
+                                    </div>
+                                </div>
+                            </ng-container>
+
+                            <!-- If Unlocked (Accepted Request) -->
+                            <ng-container *ngIf="order.customer">
+                                <div class="privacy-unlocked-content">
+                                    <div class="block-icon">
+                                        <ion-icon name="person-circle-outline"></ion-icon>
+                                    </div>
+                                    <div class="block-info">
+                                        <span class="block-title">Direct Customer Contact (Unlocked)</span>
+                                        <strong class="customer-name-txt">{{ order.customer.name }}</strong>
+                                        <a [href]="'tel:' + order.customer.mobile" class="customer-phone-link">
+                                            📞 {{ order.customer.mobile }}
+                                        </a>
+                                        <span class="customer-site-sub" *ngIf="order.site_address">
+                                            📍 {{ order.site_address }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </ng-container>
+                        </div>
+                    </div>
+
+                    <!-- Card Actions -->
+                    <div class="card-footer-actions">
+                        <!-- Pending Actions: Accept or Decline -->
+                        <div class="pending-btn-row" *ngIf="order.vendor_status === 'pending' && !order.is_removed">
+                            <button type="button" class="btn-decline-action" (click)="confirmRejectOrderRequest(order)">
+                                <ion-icon name="close-circle-outline"></ion-icon>
+                                <span>Decline</span>
+                            </button>
+                            <button type="button" class="btn-accept-action" (click)="acceptOrderRequest(order)">
+                                <ion-icon name="checkmark-circle-outline"></ion-icon>
+                                <span>✓ Accept Service & Join Project</span>
+                            </button>
+                        </div>
+
+                        <!-- Accepted Actions: Open Chat Group & SOP -->
+                        <div class="accepted-btn-row" *ngIf="order.vendor_status === 'accepted' && !order.is_removed">
+                            <button type="button" class="btn-chat-action" (click)="openChatForOrder(order)">
+                                <ion-icon name="chatbubbles"></ion-icon>
+                                <span>Project Communication Group</span>
+                            </button>
+                            <button type="button" class="btn-sop-action" (click)="openSopForOrder(order)" title="Open SOP Sequence">
+                                <ion-icon name="list-outline"></ion-icon>
+                                <span>SOP Sequence</span>
+                            </button>
+                        </div>
+
+                        <!-- Removed from Order: Notice -->
+                        <div class="removed-notice-bar" *ngIf="order.is_removed">
+                            <ion-icon name="alert-circle-outline"></ion-icon>
+                            <span>Service was removed from this project by customer. Messaging has been stopped.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: NOTIFICATIONS (Service Requests with Address & Service, Without Customer Details) -->
+        <div class="dashboard-tab-content" *ngIf="activeTab === 'notifications'">
+            <div class="notifications-section">
+                <div class="section-title-row notif-title-row">
+                    <div>
+                        <h3>Service Request Notifications</h3>
+                        <span class="notif-note">Details of site address and services requested.</span>
+                    </div>
+                    <button type="button" class="btn-refresh-notifs" (click)="openNotificationsTab()" title="Refresh Notifications">
+                        <ion-icon name="refresh-outline"></ion-icon>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+
+                <div class="state-loading-box" *ngIf="loadingNotifications">
+                    <ion-spinner name="crescent"></ion-spinner>
+                    <p>Loading notifications...</p>
+                </div>
+
+                <div class="state-empty-box" *ngIf="!loadingNotifications && notifications.length === 0">
+                    <ion-icon name="notifications-off-outline"></ion-icon>
+                    <h3>No Notifications</h3>
+                    <p>You have no new notifications at the moment.</p>
+                </div>
+
+                <div class="notifications-list" *ngIf="!loadingNotifications && notifications.length > 0">
+                    <div class="notif-card" *ngFor="let n of notifications" [class.notif-unread]="!n.is_read">
+                        <div class="notif-icon-circle" [ngClass]="{
+                            'icon-alert': n.type === 'order_progress_alert',
+                            'icon-completed': n.service_status === 'completed' || n.type === 'work_completed',
+                            'icon-declined': (n.vendor_status === 'rejected' || n.type === 'service_rejected') && n.service_status !== 'completed' && n.type !== 'work_completed',
+                            'icon-accepted': (n.vendor_status === 'accepted' || n.type === 'service_accepted') && n.service_status !== 'completed' && n.type !== 'work_completed' && n.vendor_status !== 'rejected' && n.type !== 'service_rejected',
+                            'icon-removed': n.service_status === 'removed' && n.vendor_status !== 'rejected' && n.type !== 'service_rejected' && n.service_status !== 'completed' && n.type !== 'work_completed',
+                            'icon-pending': n.vendor_status === 'pending' && n.service_status !== 'removed' && n.service_status !== 'completed' && n.vendor_status !== 'rejected' && n.type !== 'service_accepted' && n.type !== 'service_rejected' && n.type !== 'work_completed' && n.type !== 'order_progress_alert'
+                        }">
+                            <ion-icon [name]="
+                                n.type === 'order_progress_alert' ? 'time-outline' :
+                                (n.service_status === 'completed' || n.type === 'work_completed') ? 'ribbon-outline' :
+                                ((n.vendor_status === 'declined' || n.vendor_status === 'rejected' || n.type === 'service_rejected') && n.service_status !== 'completed' && n.type !== 'work_completed') ? 'close-circle-outline' :
+                                ((n.vendor_status === 'accepted' || n.type === 'service_accepted') && n.service_status !== 'completed' && n.type !== 'work_completed') ? 'checkmark-circle-outline' :
+                                (n.service_status === 'removed') ? 'alert-circle-outline' :
+                                'briefcase-outline'
+                            "></ion-icon>
+                        </div>
+                        <div class="notif-content">
+                            <div class="notif-top">
+                                <span class="notif-title">{{ n.title }}</span>
+                                <span class="notif-time">{{ n.created_at | date:'short' }}</span>
+                            </div>
+                            <p class="notif-msg">{{ n.message }}</p>
+
+                            <div class="notif-details-strip">
+                                <span class="strip-pill location-pill" *ngIf="n.site_location">📍 {{ n.site_location }}</span>
+                                <span class="strip-pill service-pill" *ngIf="n.service_name">🛠️ {{ n.service_name }}</span>
+                                <span class="strip-pill order-pill" *ngIf="n.order_no">Order #{{ n.order_no }}</span>
+                            </div>
+                        </div>
+
+                        <div class="notif-action-col">
+                            <!-- Status: Order Progress Alert (The before process is completing soon) -->
+                            <div class="status-action-wrap" *ngIf="n.type === 'order_progress_alert'">
+                                <span class="badge-notif-status status-alert">
+                                    <ion-icon name="time-outline"></ion-icon>
+                                    <span>Schedule Alert</span>
+                                </span>
+                                <button type="button" class="btn-notif-chat" (click)="openChatForNotif(n)" title="Open Project Group Chat">
+                                    <ion-icon name="chatbubbles-outline"></ion-icon>
+                                    <span>Project Chat</span>
+                                </button>
+                            </div>
+
+                            <!-- Status: Work Completed -->
+                            <div class="status-action-wrap" *ngIf="n.service_status === 'completed' || n.type === 'work_completed'">
+                                <span class="badge-notif-status status-completed">
+                                    <ion-icon name="checkmark-done-circle"></ion-icon>
+                                    <span>Completed</span>
+                                </span>
+                            </div>
+
+                            <!-- Status: Accepted by Vendor -->
+                            <div class="status-action-wrap" *ngIf="(n.vendor_status === 'accepted' || n.type === 'service_accepted') && n.service_status !== 'completed' && n.type !== 'work_completed' && n.vendor_status !== 'rejected' && n.type !== 'service_rejected' && n.type !== 'order_progress_alert'">
+                                <span class="badge-notif-status status-accepted">
+                                    <ion-icon name="checkmark-circle"></ion-icon>
+                                    <span>Accepted</span>
+                                </span>
+                                <button type="button" class="btn-notif-chat" (click)="openChatForNotif(n)" title="Open Project Group Chat">
+                                    <ion-icon name="chatbubbles-outline"></ion-icon>
+                                    <span>Project Chat</span>
+                                </button>
+                            </div>
+
+                            <!-- Status: Declined / Rejected by Vendor -->
+                            <div class="status-action-wrap" *ngIf="(n.vendor_status === 'rejected' || n.type === 'service_rejected') && n.service_status !== 'completed' && n.type !== 'work_completed'">
+                                <span class="badge-notif-status status-declined">
+                                    <ion-icon name="close-circle"></ion-icon>
+                                    <span>Declined</span>
+                                </span>
+                            </div>
+
+                            <!-- Status: Removed by Customer -->
+                            <div class="status-action-wrap" *ngIf="n.service_status === 'removed' && n.vendor_status !== 'rejected' && n.type !== 'service_rejected' && n.service_status !== 'completed' && n.type !== 'work_completed'">
+                                <span class="badge-notif-status status-removed">
+                                    <ion-icon name="alert-circle-outline"></ion-icon>
+                                    <span>Removed</span>
+                                </span>
+                            </div>
+
+                            <!-- Status: Pending Decision (Allow immediate Accept or Decline) -->
+                            <div class="status-action-wrap pending-wrap" *ngIf="n.vendor_status === 'pending' && n.service_status !== 'removed' && n.service_status !== 'completed' && n.vendor_status !== 'rejected' && n.type !== 'service_accepted' && n.type !== 'service_rejected' && n.type !== 'work_completed' && n.type !== 'order_progress_alert'">
+                                <span class="badge-notif-status status-pending">
+                                    <ion-icon name="time-outline"></ion-icon>
+                                    <span>Pending</span>
+                                </span>
+                                <div class="btn-group-notif">
+                                    <button type="button" class="btn-notif-accept" (click)="acceptRequestFromNotif(n)" [disabled]="processingId === n.service_req_id" title="Accept this service request">
+                                        <ion-icon name="checkmark-outline"></ion-icon>
+                                        <span>Accept</span>
+                                    </button>
+                                    <button type="button" class="btn-notif-decline" (click)="confirmDeclineRequestFromNotif(n)" [disabled]="processingId === n.service_req_id" title="Decline this service request">
+                                        <ion-icon name="close-outline"></ion-icon>
+                                        <span>Decline</span>
+                                    </button>
+                                    <button type="button" class="btn-notif-view" (click)="activeTab = 'orders'; orderFilter = 'pending'" title="View details in Orders">
+                                        <ion-icon name="arrow-forward-outline"></ion-icon>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: PROJECT CHATS (Assigned & Accepted Projects Only) -->
+        <div class="dashboard-tab-content" *ngIf="activeTab === 'chat'">
+            <div class="chats-hub-container">
+                <div class="section-title-row">
+                    <h3>Project Group Chats</h3>
+                    <span class="notif-note">WhatsApp-style live communication with customers and co-contractors.</span>
+                </div>
+
+                <div class="state-loading-box" *ngIf="loadingConversations">
+                    <ion-spinner name="crescent"></ion-spinner>
+                    <p>Loading project conversations...</p>
+                </div>
+
+                <div class="state-empty-box" *ngIf="!loadingConversations && conversations.length === 0">
+                    <ion-icon name="chatbubbles-outline"></ion-icon>
+                    <h3>No Active Project Chats</h3>
+                    <p>Accept a pending service request to be automatically joined into the live project group chat with the customer.</p>
+                    <button type="button" class="btn-browse-orders" (click)="activeTab = 'orders'">View My Orders</button>
+                </div>
+
+                <div class="conversations-grid" *ngIf="!loadingConversations && conversations.length > 0">
+                    <div class="conv-card" *ngFor="let conv of conversations" (click)="openConversation(conv)">
+                        <div class="conv-avatar">
+                            <ion-icon name="people"></ion-icon>
+                        </div>
+                        <div class="conv-info">
+                            <div class="conv-top-row">
+                                <h4 class="conv-title">{{ conv.title || ('Project Order #' + conv.order_no) }}</h4>
+                                <span class="conv-date">{{ conv.last_message_at | date:'shortTime' }}</span>
+                            </div>
+                            <p class="conv-last-msg">
+                                <strong *ngIf="conv.last_sender_name">{{ conv.last_sender_name }}: </strong>
+                                <span>{{ conv.last_message || 'Start chatting with the project team...' }}</span>
+                            </p>
+                            <div class="conv-participants-row" *ngIf="conv.participants">
+                                <span class="participant-count">{{ conv.participants.length }} team members in group</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-enter-chat">
+                            <span>Open Chat</span>
+                            <ion-icon name="arrow-forward"></ion-icon>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: MY PROFILE (Enlisted Services & Verification Status) -->
+        <div class="dashboard-tab-content" *ngIf="activeTab === 'profile'">
+            <div class="profile-card">
+                <div class="profile-top-hero">
+                    <div class="profile-img-wrap">
+                        <img *ngIf="currentVendor?.image" [src]="formatImageUrl(currentVendor.image)" [alt]="currentVendor.name" />
+                        <span *ngIf="!currentVendor?.image" class="profile-placeholder">{{ (currentVendor?.name || 'V').charAt(0).toUpperCase() }}</span>
+                    </div>
+                    <div class="profile-hero-info">
+                        <h2 class="profile-name">{{ currentVendor?.name }}</h2>
+                        <span class="profile-role">Registered CivilWorks Trade Partner</span>
+                        <div class="profile-badges-row">
+                            <span class="badge-status-active">✔ Active Partner</span>
+                            <span class="badge-id">Partner ID #{{ currentVendor?.id }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-details-grid">
+                    <div class="profile-item">
+                        <span class="item-label">Mobile Number</span>
+                        <strong class="item-val">+91 {{ currentVendor?.mobile }}</strong>
+                    </div>
+
+                    <div class="profile-item">
+                        <span class="item-label">Email Address</span>
+                        <strong class="item-val">{{ currentVendor?.email || 'Not provided' }}</strong>
+                    </div>
+
+                    <div class="profile-item">
+                        <span class="item-label">Network Status</span>
+                        <strong class="item-val text-success">Active & Eligible for Orders</strong>
+                    </div>
+
+                    <div class="profile-item">
+                        <span class="item-label">Admin Module Mapping</span>
+                        <strong class="item-val">Mapped to Admin Vendors List</strong>
+                    </div>
+                </div>
+
+                <div class="profile-services-block">
+                    <h4>SERVICES ENLISTED & PROVIDED</h4>
+                    <p>You will automatically receive customer orders requesting any of these verified service subcategories:</p>
+                    <div class="enlisted-services-chips">
+                        <span class="enlisted-chip" *ngFor="let s of currentVendor?.services">
+                            <ion-icon name="checkmark-circle"></ion-icon>
+                            <span>{{ s.name }}</span>
+                            <span class="chip-cat-tag" *ngIf="s.category_name">({{ s.category_name }})</span>
+                        </span>
+                        <span class="no-services-txt" *ngIf="!currentVendor?.services || currentVendor.services.length === 0">
+                            No service subcategories mapped yet.
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</ion-content>
+
+<!-- VENDOR SOP MODAL 1: ADD SUB TASK -->
+<div class="sop-modal-backdrop" *ngIf="showAddSubtaskModal" (click)="closeAddSubtaskModal()">
+    <div class="sop-modal-card add-subtask-card" (click)="$event.stopPropagation()">
+        <div class="modal-card-header">
+            <h3 class="modal-card-title">Add Sub Task</h3>
+            <button type="button" class="modal-close-btn" (click)="closeAddSubtaskModal()">
+                <ion-icon name="close"></ion-icon>
+            </button>
+        </div>
+        <div class="modal-card-body">
+            <div class="modal-form-grid">
+                <div class="form-field-group">
+                    <label class="form-label">Title *</label>
+                    <input type="text" [(ngModel)]="newSubtask.title" placeholder="Enter sub task title" class="form-text-input" />
+                </div>
+                <div class="form-field-group">
+                    <label class="form-label">Start Date *</label>
+                    <input type="date" [(ngModel)]="newSubtask.start_date" class="form-text-input date-input" />
+                </div>
+                <div class="form-field-group full-width-field">
+                    <label class="form-label">Description *</label>
+                    <textarea [(ngModel)]="newSubtask.description" rows="3" placeholder="Enter description" class="form-textarea-input"></textarea>
+                </div>
+                <div class="form-field-group">
+                    <label class="form-label">End Date *</label>
+                    <input type="date" [(ngModel)]="newSubtask.end_date" class="form-text-input date-input" />
+                </div>
+                <div class="form-field-group">
+                    <label class="form-label">Notify Next Service (Vendor)</label>
+                    <select [(ngModel)]="newSubtask.next_order_service_id" class="form-text-input" style="height: 42px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; padding: 0 10px; font-size: 13px; color: #111827; width: 100%;">
+                        <option [ngValue]="null">-- Select Next Vendor/Service --</option>
+                        <option *ngFor="let svc of getAvailableNextServices()" [value]="svc.id">
+                            {{ svc.service_name || svc.subcategory_name }} ({{ svc.vendor_name || 'Vendor #' + svc.vendor_id }})
+                        </option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="modal-card-footer">
+            <button type="button" class="btn-footer-cancel" (click)="closeAddSubtaskModal()">Cancel</button>
+            <button type="button" class="btn-footer-save" [disabled]="!newSubtask.title.trim() || isSavingSubtask" (click)="saveSubtask()">
+                <ion-spinner *ngIf="isSavingSubtask" name="crescent"></ion-spinner>
+                <span *ngIf="!isSavingSubtask">Save Subtask</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- VENDOR SOP MODAL 2: SUBTASK DETAILS & PROOF UPLOAD -->
+<div class="sop-modal-backdrop" *ngIf="showSubtaskDetailsModal" (click)="closeSubtaskDetailsModal()">
+    <div class="sop-modal-card view-subtask-card" (click)="$event.stopPropagation()">
+        <div class="modal-card-header">
+            <div class="subtask-modal-heading-wrap">
+                <span class="subtask-circle-dot" [ngClass]="getSubtaskDotClass(selectedSubtask?.status || 'pending')"></span>
+                <h3 class="modal-card-title">{{ selectedSubtask?.title }}</h3>
+                <span class="st-card-status-badge" [ngClass]="getSubtaskBadgeClass(selectedSubtask?.status || 'pending')">
+                    {{ getStatusText(selectedSubtask?.status || 'pending') }}
+                </span>
+            </div>
+            <button type="button" class="modal-close-btn" (click)="closeSubtaskDetailsModal()">
+                <ion-icon name="close"></ion-icon>
+            </button>
+        </div>
+        <div class="modal-card-body" *ngIf="selectedSubtask">
+            <div class="subtask-meta-row">
+                <span class="meta-label">Parent Trade:</span>
+                <span class="meta-val">{{ selectedSubtaskService?.service_name || selectedSubtaskService?.subcategory_name }}</span>
+            </div>
+            <div class="subtask-meta-row" *ngIf="selectedSubtask.start_date">
+                <span class="meta-label">Timeline:</span>
+                <span class="meta-val">{{ selectedSubtask.start_date | date:'dd MMM yyyy' }} {{ selectedSubtask.end_date ? ('to ' + (selectedSubtask.end_date | date:'dd MMM yyyy')) : '' }}</span>
+            </div>
+            <div class="subtask-desc-section">
+                <h4 class="subtask-section-subtitle">Description</h4>
+                <p class="subtask-desc-paragraph">{{ selectedSubtask.description || 'No detailed description.' }}</p>
+            </div>
+
+            <!-- Upload Completion Proof Section -->
+            <div class="subtask-proof-section">
+                <div class="proof-sec-top-line">
+                    <h4 class="subtask-section-subtitle">
+                        <ion-icon name="images-outline"></ion-icon>
+                        <span>Completion Proof Images</span>
+                    </h4>
+                    <label class="btn-upload-proof-label" *ngIf="selectedSubtask?.status !== 'completed'">
+                        <ion-spinner *ngIf="isUploadingProof" name="crescent"></ion-spinner>
+                        <ion-icon *ngIf="!isUploadingProof" name="cloud-upload-outline"></ion-icon>
+                        <span>{{ isUploadingProof ? 'Uploading...' : '+ Upload Photo Proof' }}</span>
+                        <input type="file" (change)="onProofFileSelected($event, selectedSubtask)" accept="image/*" style="display: none;" />
+                    </label>
+                </div>
+
+                <!-- Main Large Image Card -->
+                <div class="proof-img-box" *ngIf="hasSubtaskProof()" (click)="previewImageUrl = formatImageUrl(getActiveSubtaskProofUrl())" title="Click to enlarge">
+                    <img [src]="formatImageUrl(getActiveSubtaskProofUrl())" alt="Proof Image" />
+                    <span class="click-hint">Click to enlarge</span>
+                </div>
+
+                <div class="proof-gallery-grid" *ngIf="hasSubtaskProof() && getSubtaskProofImages().length > 1">
+                    <div class="proof-thumb-card" 
+                        *ngFor="let p of getSubtaskProofImages()" 
+                        [class.active-thumb]="getActiveSubtaskProofUrl() === p.image_url"
+                        (click)="selectSubtaskProofImage(p.image_url, $event)"
+                        title="Click to view in card above">
+                        <img [src]="formatImageUrl(p.image_url)" [alt]="p.original_name || 'Proof'" />
+                    </div>
+                </div>
+
+                <div class="proof-empty-message" *ngIf="!hasSubtaskProof()">
+                    <ion-icon name="image-outline"></ion-icon>
+                    <p>No proof photos uploaded yet. Click "+ Upload Photo Proof" to attach site images.</p>
+                </div>
+            </div>
+        </div>
+        <div class="modal-card-footer">
+            <button type="button" class="btn-footer-cancel" (click)="closeSubtaskDetailsModal()">Close</button>
+            <button *ngIf="selectedSubtask && selectedSubtask.status !== 'completed'" type="button" class="btn-footer-save" (click)="completeSubtask(selectedSubtask)">
+                <ion-icon name="checkmark-circle"></ion-icon>
+                <span>Mark Subtask Completed</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- VENDOR SOP MODAL 3: RAISE COMPLETION REQUEST -->
+<div class="sop-modal-backdrop" *ngIf="showRaiseCompletionModal" (click)="closeRaiseCompletionModal()">
+    <div class="sop-modal-card add-subtask-card" (click)="$event.stopPropagation()">
+        <div class="modal-card-header">
+            <h3 class="modal-card-title">Raise Service Completion Request</h3>
+            <button type="button" class="modal-close-btn" (click)="closeRaiseCompletionModal()">
+                <ion-icon name="close"></ion-icon>
+            </button>
+        </div>
+        <div class="modal-card-body" *ngIf="targetServiceForCompletion">
+            <div class="review-banner-alert">
+                <ion-icon name="information-circle"></ion-icon>
+                <div>
+                    Submit completion request for <strong>{{ targetServiceForCompletion.service_name || targetServiceForCompletion.subcategory_name }}</strong> to customer for sign-off.
+                </div>
+            </div>
+            <div class="form-field-group">
+                <label class="form-label">Note for Customer *</label>
+                <textarea [(ngModel)]="completionNote" rows="3" placeholder="Provide completion summary or notes..." class="form-textarea-input"></textarea>
+            </div>
+        </div>
+        <div class="modal-card-footer">
+            <button type="button" class="btn-footer-cancel" (click)="closeRaiseCompletionModal()">Cancel</button>
+            <button type="button" class="btn-footer-save" [disabled]="!completionNote.trim() || isRaisingCompletion" (click)="submitRaiseCompletion()">
+                <ion-spinner *ngIf="isRaisingCompletion" name="crescent"></ion-spinner>
+                <span *ngIf="!isRaisingCompletion">Submit Request to Customer</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="sop-lightbox-overlay" *ngIf="previewImageUrl" (click)="previewImageUrl = null">
+    <div class="lightbox-content-box" (click)="$event.stopPropagation()">
+        <button type="button" class="lightbox-close-btn" (click)="previewImageUrl = null">
+            <ion-icon name="close"></ion-icon>
+        </button>
+        <img [src]="previewImageUrl" alt="Subtask Proof Preview" />
+    </div>
+</div>
+
+<!-- WhatsApp-Style Live Project Group Chat Drawer (with embedded SOP Sequence) -->
+<app-chat-panel
+    [isOpen]="showChatPanel"
+    [initialOrderId]="chatInitialOrderId"
+    [initialViewTab]="chatInitialViewTab"
+    (close)="showChatPanel = false; loadDashboardData()">
+</app-chat-panel>
