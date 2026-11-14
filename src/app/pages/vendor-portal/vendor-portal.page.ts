@@ -20,6 +20,9 @@ export class VendorPortalPage implements OnInit, OnDestroy {
     vendorMobile = '';
     otpCode = '';
     isAuthenticating = false;
+    /** True while the API runs with demo OTPs (1234); false once real SMS OTPs are on. */
+    otpDemoMode = true;
+    isSendingSignupOtp = false;
     isUploadingPhoto = false;
 
     currentVendor: any = null;
@@ -182,19 +185,20 @@ export class VendorPortalPage implements OnInit, OnDestroy {
             next: (res) => {
                 this.isAuthenticating = false;
                 const data = res.data;
+                this.otpDemoMode = !!data.otp;
                 if (data.exists) {
                     // Vendor is already enlisted in the system -> trigger OTP verification login!
                     this.currentVendor = data.vendor;
                     this.authStep = 'otp';
                     this.otpCode = '';
-                    this.showToast(`Welcome back, ${data.vendor.name}! Verification OTP sent to +91 ${clean} (Default: 1234)`, 'success');
+                    this.showToast(`Welcome back, ${data.vendor.name}! Verification OTP sent to +91 ${clean}${this.otpDemoMode ? ' (Default: 1234)' : ''}`, 'success');
                 } else {
                     // Vendor not yet enlisted -> switch to Sign Up form with all details
                     this.signupData.mobile = clean;
                     this.signupData.otp = '';
                     this.selectedSubcategoryIds = [];
                     this.authStep = 'signup';
-                    this.showToast(`New partner mobile detected. Please complete your registration details below.`, 'primary');
+                    this.showToast(this.otpDemoMode ? `New partner mobile detected. Please complete your registration details below.` : `New partner mobile detected. We sent an OTP to +91 ${clean}; enter it in the form below.`, 'primary');
                 }
             },
             error: (err) => {
@@ -287,7 +291,7 @@ export class VendorPortalPage implements OnInit, OnDestroy {
             image: this.signupData.image || null,
             status: this.signupData.status || 'active',
             services: this.selectedSubcategoryIds,
-            otp: this.signupData.otp ? this.signupData.otp.trim() : '1234'
+            otp: this.signupData.otp ? this.signupData.otp.trim() : (this.otpDemoMode ? '1234' : '')
         };
 
         this.http.post<any>(`${environment.apiUrl}/vendor-portal/signup`, payload).subscribe({
@@ -313,9 +317,31 @@ export class VendorPortalPage implements OnInit, OnDestroy {
         if (this.vendorMobile && !this.signupData.mobile) {
             this.signupData.mobile = this.vendorMobile.replace(/\D/g, '').slice(-10);
         }
-        if (!this.signupData.otp) {
+        if (!this.signupData.otp && this.otpDemoMode) {
             this.signupData.otp = '1234';
         }
+    }
+
+    /** Send (or resend) the verification OTP for a new vendor signing up. */
+    sendSignupOtp() {
+        const clean = (this.signupData.mobile || '').replace(/\D/g, '').slice(-10);
+        if (clean.length < 10) {
+            this.showToast('Enter your 10-digit mobile number first', 'warning');
+            return;
+        }
+        this.isSendingSignupOtp = true;
+        this.http.post<any>(`${environment.apiUrl}/vendor-portal/send-otp`, { mobile: clean }).subscribe({
+            next: (res) => {
+                this.isSendingSignupOtp = false;
+                this.otpDemoMode = !!res.data?.otp;
+                if (!this.otpDemoMode && this.signupData.otp === '1234') this.signupData.otp = '';
+                this.showToast(this.otpDemoMode ? 'Demo mode: use OTP 1234' : `OTP sent to +91 ${clean}`, 'success');
+            },
+            error: (err) => {
+                this.isSendingSignupOtp = false;
+                this.showToast(err.error?.message || 'Could not send the OTP. Please try again.', 'danger');
+            }
+        });
     }
 
     resetAuth() {

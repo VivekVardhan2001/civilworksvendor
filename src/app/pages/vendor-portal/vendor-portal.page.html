@@ -195,8 +195,11 @@
 
                 <!-- OTP Verification Field for Signup -->
                 <div class="form-group otp-group-signup">
-                    <label class="field-label">MOBILE VERIFICATION OTP * (Default: 1234)</label>
-                    <input type="text" class="text-input-field otp-signup-input" [(ngModel)]="signupData.otp" placeholder="Enter 1234" maxlength="4" />
+                    <label class="field-label">MOBILE VERIFICATION OTP *{{ otpDemoMode ? ' (Default: 1234)' : '' }}</label>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="text" inputmode="numeric" class="text-input-field otp-signup-input" [(ngModel)]="signupData.otp" [placeholder]="otpDemoMode ? 'Enter 1234' : 'Enter the 4-digit OTP'" maxlength="4" style="flex:1;" />
+                        <button type="button" class="btn-modal-cancel" style="white-space:nowrap;" [disabled]="isSendingSignupOtp" (click)="sendSignupOtp()">{{ isSendingSignupOtp ? 'Sending...' : 'Send OTP' }}</button>
+                    </div>
                 </div>
 
                 <!-- ACTION BUTTONS -->
